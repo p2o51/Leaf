@@ -64,6 +64,17 @@ interface LeafDao {
         upsertBlocks(items)
     }
 
+    /** Swaps in a fetched body unless the essay changed locally since [expected] was read. */
+    @Transaction
+    suspend fun replaceBodyIfUnchanged(essayId: String, expected: List<EssayBlockEntity>, items: List<EssayBlockEntity>): Boolean {
+        val current = blocksOf(essayId)
+        val waiting = pendingOps().map { it.targetId }.toSet()
+        if (current != expected || essayId in waiting || current.any { it.id in waiting }) return false
+        replaceBlocks(essayId, items)
+        essay(essayId)?.let { upsertEssays(listOf(it.copy(bodyLoaded = true))) }
+        return true
+    }
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun enqueue(item: OutboxEntity)
 

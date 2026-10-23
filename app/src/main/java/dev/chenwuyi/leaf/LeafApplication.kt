@@ -27,7 +27,7 @@ class AppContainer(context: Context) {
     private val photos = PhotoStore(context)
     val connection = PrefsConnectionStore(context)
     private val notion = LeafNotion()
-    val sync = SyncEngine(database.dao(), notion, connection, readPhoto = photos::read)
+    val sync = SyncEngine(database.dao(), notion, connection, readPhoto = photos::read, downloadPhoto = photos::download)
     val scheduler = SyncScheduler(context)
     val setup = NotionSetup(notion, connection, database.dao(), sync)
     val repository = RoomLeafRepository(

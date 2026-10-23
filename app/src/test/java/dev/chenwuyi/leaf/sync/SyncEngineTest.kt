@@ -122,4 +122,43 @@ class SyncEngineTest {
         assertEquals(NotionColor.Orange, (local[1] as EssayBlock.Paragraph).color)
         assertNotNull(db.dao().blocksOf("e1")[2].blockId)
     }
+
+    @Test
+    fun should_upload_the_image_again_when_a_deleted_notion_photo_is_restored() = runBlocking {
+        val withDownload = SyncEngine(db.dao(), LeafNotion(NotionClient(baseUrl = "http://127.0.0.1:${server.port}/v1/".toHttpUrl(), requestIntervalMillis = 0)), store,
+            downloadPhoto = { byteArrayOf(1, 2, 3) })
+        fake.children["wall"] = mutableListOf(fake.image("i1", "https://files.example/a.jpg"))
+        withDownload.run()
+        val photo = repo.scribbles.first().single()
+        val removed = repo.deleteScribbles(setOf(photo.id))
+        repo.restoreScribbles(removed)
+        withDownload.run(pull = false)
+
+        val wall = fake.children.getValue("wall")
+        assertEquals(listOf("image"), wall.map { it.json.getString("type") })
+        assertEquals("file_upload", wall.single().json.getJSONObject("image").getString("type"))
+    }
+
+    @Test
+    fun should_keep_local_typing_when_the_body_changed_during_a_fetch() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0)))
+        val before = listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default"))
+        db.dao().upsertBlocks(before)
+        db.dao().upsertBlocks(listOf(before.single().copy(text = "早上，路口")))
+        val replaced = db.dao().replaceBodyIfUnchanged("e1", before, listOf(EssayBlockEntity("n1", "e1", 0, "x1", "paragraph", "早上", "default")))
+        assertEquals(false, replaced)
+        assertEquals("早上，路口", db.dao().blocksOf("e1").single().text)
+    }
+
+    @Test
+    fun should_keep_local_block_ids_when_loading_a_body_again() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0)))
+        db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default")))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上，路口"), fake.paragraph("x2", "晚上"))
+        engine.loadBody("e1")
+        val blocks = db.dao().blocksOf("e1")
+        assertEquals(listOf("早上，路口", "晚上"), blocks.map { it.text })
+        assertEquals("k1", blocks.first().id)
+        assertTrue(db.dao().essay("e1")!!.bodyLoaded)
+    }
 }

@@ -20,6 +20,11 @@ class FakeNotion : Dispatcher() {
         .put("object", "block").put("id", id).put("type", "paragraph").put("created_time", created)
         .put("paragraph", JSONObject().put("color", color).put("rich_text", JSONArray().put(JSONObject().put("plain_text", text)))))
 
+    fun image(id: String, url: String, caption: String = "") = Block(id, JSONObject()
+        .put("object", "block").put("id", id).put("type", "image").put("created_time", "2026-10-20T01:00:00.000Z")
+        .put("image", JSONObject().put("type", "file").put("file", JSONObject().put("url", url))
+            .put("caption", JSONArray().apply { if (caption.isNotEmpty()) put(JSONObject().put("plain_text", caption)) })))
+
     fun row(id: String, title: String, type: String?, edited: String = "2026-10-21T00:00:00.000Z"): JSONObject {
         val props = JSONObject().put("Name", JSONObject().put("type", "title").put("title", JSONArray().put(JSONObject().put("plain_text", title))))
         if (type != null) props.put("类型", JSONObject().put("type", "select").put("select", JSONObject().put("name", type)))
@@ -28,7 +33,8 @@ class FakeNotion : Dispatcher() {
 
     override fun dispatch(request: RecordedRequest): MockResponse {
         val path = request.requestUrl!!.encodedPath.removePrefix("/v1/")
-        val body = request.body.readUtf8().takeIf { it.isNotBlank() }?.let(::JSONObject)
+        val raw = request.body.readUtf8()
+        val body = raw.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
         log += "${request.method} $path${body?.let { " $it" } ?: ""}"
         val parts = path.split('/')
         return when {
@@ -60,6 +66,8 @@ class FakeNotion : Dispatcher() {
                 rows += JSONObject(body.toString()).put("object", "page").put("id", id).put("last_edited_time", "2026-10-23T09:00:00.000Z")
                 ok(JSONObject().put("id", id))
             }
+            request.method == "POST" && path == "file_uploads" -> ok(JSONObject().put("id", "up-${next++}").put("status", "pending"))
+            request.method == "POST" && parts[0] == "file_uploads" && parts.getOrNull(2) == "send" -> ok(JSONObject().put("id", parts[1]).put("status", "uploaded"))
             request.method == "PATCH" && parts[0] == "pages" -> ok(JSONObject().put("id", parts[1]))
             else -> MockResponse().setResponseCode(404).setBody("""{"object":"error"}""")
         }

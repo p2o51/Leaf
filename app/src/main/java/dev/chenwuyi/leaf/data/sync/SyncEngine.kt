@@ -43,6 +43,7 @@ class SyncEngine(
     private val notion: LeafNotion,
     private val store: ConnectionStore,
     private val readPhoto: (String) -> ByteArray? = { null },
+    private val downloadPhoto: suspend (String) -> ByteArray? = { null },
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
     private val mutex = Mutex()
@@ -122,8 +123,10 @@ class SyncEngine(
         val blockId = row.blockId
         val isPhoto = row.localPhoto != null || row.remotePhoto != null
         if (blockId == null) {
-            val block = if (row.localPhoto != null) {
-                val bytes = readPhoto(row.localPhoto) ?: return
+            val block = if (isPhoto) {
+                // A restored photo from Notion has only its file URL; Notion's own URLs expire, so the
+                // image goes up again as a new upload instead of being linked.
+                val bytes = row.localPhoto?.let(readPhoto) ?: row.remotePhoto?.let { downloadPhoto(it) } ?: return
                 NotionJson.image(notion.uploadImage(token, "leaf-${row.id}.jpg", "image/jpeg", bytes), row.text)
             } else {
                 NotionJson.paragraph(row.text, color)
@@ -224,7 +227,7 @@ class SyncEngine(
     }
 
     /** Loads one essay's body unless it is loaded already or has edits still waiting to go out. */
-    suspend fun loadBody(essayId: String) = mutex.withLock {
+    suspend fun loadBody(essayId: String): Unit = mutex.withLock {
         val c = store.connection.value ?: return@withLock
         val token = store.token() ?: return@withLock
         val essay = dao.essay(essayId) ?: return@withLock
@@ -232,10 +235,14 @@ class SyncEngine(
         if (essay.bodyLoaded) return@withLock
         val waiting = pending()
         if (essayId in waiting || dao.blocksOf(essayId).any { it.id in waiting }) return@withLock
+        val before = dao.blocksOf(essayId)
         val blocks = try { notion.essayBody(token, pageId) } catch (_: NotionException) { return@withLock }
-        dao.replaceBlocks(essayId, blocks.mapIndexed { i, b ->
-            EssayBlockEntity(newId(), essayId, i, b.blockId, b.type, b.text, b.color.apiName)
-        })
-        dao.upsertEssays(listOf((dao.essay(essayId) ?: essay).copy(bodyLoaded = true)))
+        // Blocks already known keep their local ID, so an edit made from the old list still lands on them.
+        val known = before.filter { it.blockId != null }.associate { it.blockId to it.id }
+        val rows = blocks.mapIndexed { i, b ->
+            EssayBlockEntity(known[b.blockId] ?: newId(), essayId, i, b.blockId, b.type, b.text, b.color.apiName)
+        }
+        // The editor writes without this mutex, so typing during the fetch must win over the fetched body.
+        dao.replaceBodyIfUnchanged(essayId, before, rows)
     }
 }
