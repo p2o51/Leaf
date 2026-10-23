@@ -1,6 +1,7 @@
 package dev.chenwuyi.leaf.ui
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.LeafRepository
 import dev.chenwuyi.leaf.data.NotionColor
@@ -8,9 +9,12 @@ import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.WallSort
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /** What the full wall shows: which scribble was tapped (ringed, centred), its likely mis-tap neighbours, selection. */
 data class WallState(
@@ -21,9 +25,9 @@ data class WallState(
     val selected: Set<String> = emptySet(),
 )
 
-class LeafViewModel(private val repository: LeafRepository) : ViewModel() {
-    val scribbles: StateFlow<List<Scribble>> = repository.scribbles
-    val essays: StateFlow<List<Essay>> = repository.essays
+class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> Unit = {}) : ViewModel() {
+    val scribbles: StateFlow<List<Scribble>> = repository.scribbles.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val essays: StateFlow<List<Essay>> = repository.essays.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val queryState = MutableStateFlow("")
     val query: StateFlow<String> = queryState.asStateFlow()
@@ -34,6 +38,10 @@ class LeafViewModel(private val repository: LeafRepository) : ViewModel() {
     /** Null while the wall is closed. */
     private val wallState = MutableStateFlow<WallState?>(null)
     val wall: StateFlow<WallState?> = wallState.asStateFlow()
+
+    init {
+        viewModelScope.launch { seed() }
+    }
 
     fun setQuery(q: String) = queryState.update { q }
 
@@ -56,38 +64,45 @@ class LeafViewModel(private val repository: LeafRepository) : ViewModel() {
 
     fun selectAll() = wallState.update { it?.copy(selected = scribbles.value.map(Scribble::id).toSet()) }
 
-    fun addScribble(text: String, color: NotionColor, photo: Picture? = null): Scribble? {
-        if (text.isBlank() && photo == null) return null
-        return repository.addScribble(text, color, photo)
+    /** Saves a scribble unless it is empty; [onAdded] gets it for the undo snackbar. */
+    fun addScribble(text: String, color: NotionColor, photo: Picture? = null, onAdded: (Scribble) -> Unit = {}) {
+        if (text.isBlank() && photo == null) return
+        viewModelScope.launch { onAdded(repository.addScribble(text, color, photo)) }
     }
 
-    fun recolor(ids: Set<String>, color: NotionColor) = repository.recolor(ids, color)
+    fun recolor(ids: Set<String>, color: NotionColor) {
+        viewModelScope.launch { repository.recolor(ids, color) }
+    }
 
-    fun delete(ids: Set<String>): List<Scribble> {
-        val removed = repository.deleteScribbles(ids)
+    fun delete(ids: Set<String>, onDeleted: (List<Scribble>) -> Unit = {}) {
         wallState.update { it?.copy(selected = it.selected - ids) }
-        return removed
+        viewModelScope.launch { onDeleted(repository.deleteScribbles(ids)) }
     }
 
-    fun restore(scribbles: List<Scribble>) = repository.restoreScribbles(scribbles)
+    fun restore(scribbles: List<Scribble>) {
+        viewModelScope.launch { repository.restoreScribbles(scribbles) }
+    }
 
     /** Copies scribbles into an essay (new when [essayId] is null), leaves the wall and opens that essay. */
     fun copyToEssay(ids: Set<String>, essayId: String?) {
         if (ids.isEmpty()) return
-        val id = repository.copyToEssay(ids, essayId)
         wallState.update { null }
-        openEssayState.update { id }
+        viewModelScope.launch { openEssay(repository.copyToEssay(ids, essayId)) }
     }
 
     fun newEssay() {
-        val e = repository.newEssay()
         wallState.update { null }
-        openEssayState.update { e.id }
+        viewModelScope.launch { openEssayState.update { repository.newEssay().id } }
     }
 
-    fun openEssay(id: String) = openEssayState.update { id }
+    fun openEssay(id: String) {
+        openEssayState.update { id }
+        viewModelScope.launch { repository.loadEssayBody(id) }
+    }
 
     fun closeEssay() = openEssayState.update { null }
 
-    fun updateEssay(essay: Essay) = repository.updateEssay(essay)
+    fun updateEssay(essay: Essay) {
+        viewModelScope.launch { repository.updateEssay(essay) }
+    }
 }

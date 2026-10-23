@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.animateDpAsState
@@ -54,18 +55,24 @@ import dev.chenwuyi.leaf.ui.home.AddKind
 import dev.chenwuyi.leaf.ui.home.AddMenu
 import dev.chenwuyi.leaf.ui.home.HomePane
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
+import dev.chenwuyi.leaf.ui.settings.SettingsScreen
+import dev.chenwuyi.leaf.ui.settings.SettingsViewModel
+import dev.chenwuyi.leaf.ui.settings.syncLine
 import dev.chenwuyi.leaf.ui.wall.WallActions
 import dev.chenwuyi.leaf.ui.wall.WallScreen
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LeafApp(vm: LeafViewModel) {
+fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
     val allScribbles by vm.scribbles.collectAsStateWithLifecycle()
     val allEssays by vm.essays.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val openId by vm.openEssayId.collectAsStateWithLifecycle()
     val wall by vm.wall.collectAsStateWithLifecycle()
+    val connection by settings.connection.collectAsStateWithLifecycle()
+    val syncStatus by settings.status.collectAsStateWithLifecycle()
+    var settingsOpen by remember { mutableStateOf(false) }
 
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -91,6 +98,7 @@ fun LeafApp(vm: LeafViewModel) {
         }
     }
 
+    BackHandler(settingsOpen) { settingsOpen = false }
     BackHandler(capture != null) { capture = null }
     BackHandler(menuOpen) { menuOpen = false }
     BackHandler(wall != null && capture == null) { if (wall?.selecting == true) vm.stopSelecting() else vm.closeWall() }
@@ -111,10 +119,7 @@ fun LeafApp(vm: LeafViewModel) {
         toggle = vm::toggleSelected,
         selectAll = vm::selectAll,
         recolor = vm::recolor,
-        delete = { ids ->
-            val removed = vm.delete(ids)
-            notify("删了 ${removed.size} 条") { vm.restore(removed) }
-        },
+        delete = { ids -> vm.delete(ids) { removed -> notify("删了 ${removed.size} 条") { vm.restore(removed) } } },
         copyToEssay = { ids, essayId ->
             val title = allEssays.firstOrNull { it.id == essayId }?.title?.ifBlank { "无标题" }
             vm.copyToEssay(ids, essayId)
@@ -138,12 +143,12 @@ fun LeafApp(vm: LeafViewModel) {
                             Panes(
                                 listContent = { m ->
                                     Box(m) {
-                                        HomePane(scribbles, essays, query, openId, vm::setQuery, vm::openWall, vm::openEssay, Modifier.fillMaxSize())
+                                        HomePane(scribbles, essays, query, openId, vm::setQuery, vm::openWall, vm::openEssay, { settingsOpen = true }, Modifier.fillMaxSize())
                                         AddMenu(menuOpen, { menuOpen = it }, onAdd, onLongPress = { capture = Capture.Voice })
                                     }
                                 },
                                 editor = openEssay?.let { e ->
-                                    { m -> EssayEditor(e, allScribbles, vm::closeEssay, vm::updateEssay, m) }
+                                    { m -> EssayEditor(e, allScribbles, syncLine(connection, syncStatus), vm::closeEssay, vm::updateEssay, m) }
                                 },
                             )
                         }
@@ -156,10 +161,12 @@ fun LeafApp(vm: LeafViewModel) {
             onDismiss = { capture = null },
             onSave = { text, color, photo ->
                 capture = null
-                val s = vm.addScribble(text, color, photo)
-                if (s != null) notify("记下了") { vm.delete(setOf(s.id)) }
+                vm.addScribble(text, color, photo) { s -> notify("记下了") { vm.delete(setOf(s.id)) } }
             },
         )
+        AnimatedVisibility(settingsOpen, enter = slideInHorizontally(LeafMotion.expressive()) { it }, exit = slideOutHorizontally(LeafMotion.tool()) { it }) {
+            SettingsScreen(settings, onClose = { settingsOpen = false })
+        }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 100.dp))
     }
 }

@@ -47,12 +47,13 @@ object WallRules {
     fun dayLabel(day: LocalDate): String = "${day.monthValue}月${day.dayOfMonth}日"
 
     /**
-     * Copies scribbles to the end of an essay as synced blocks, oldest first, each followed by an empty
-     * paragraph to write into. With no essay, starts a new untitled one.
+     * 复制到随笔: copies scribbles to the end of an essay, oldest first, as paragraphs in the scribble's
+     * colour, each followed by an empty paragraph to write into. With no essay, starts a new untitled one.
+     * They are copies; linking them as Notion synced blocks comes with M3.
      */
     fun copyInto(essay: Essay?, scribbles: List<Scribble>, now: Instant, newId: () -> String): Essay {
-        val added = scribbles.sortedBy { it.createdAt }.flatMap {
-            listOf(EssayBlock.SyncedScribble(newId(), it.id), EssayBlock.Paragraph(newId(), ""))
+        val added = scribbles.sortedBy { it.createdAt }.filter { it.text.isNotBlank() }.flatMap {
+            listOf(EssayBlock.Paragraph(newId(), it.text, color = it.color), EssayBlock.Paragraph(newId(), ""))
         }
         val base = essay ?: Essay(newId(), "", emptyList(), NotionColor.Default, null, pinned = false, editedAt = now)
         return base.copy(blocks = base.blocks + added, editedAt = now)

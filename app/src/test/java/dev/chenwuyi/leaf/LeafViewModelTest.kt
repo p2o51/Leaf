@@ -4,13 +4,26 @@ import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.data.InMemoryLeafRepository
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.SampleData
+import dev.chenwuyi.leaf.data.Scribble
+import dev.chenwuyi.leaf.data.WallSort
 import dev.chenwuyi.leaf.ui.LeafViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LeafViewModelTest {
+    @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
+    @After fun tearDown() = Dispatchers.resetMain()
+
     private fun vm() = LeafViewModel(InMemoryLeafRepository(SampleData.scribbles, SampleData.essays))
 
     @Test
@@ -22,8 +35,8 @@ class LeafViewModelTest {
         vm.copyToEssay(vm.wall.value!!.selected, "e25")
         assertNull(vm.wall.value)
         assertEquals("e25", vm.openEssayId.value)
-        val synced = vm.essays.value.first { it.id == "e25" }.blocks.filterIsInstance<EssayBlock.SyncedScribble>().map { it.scribbleId }
-        assertEquals(listOf("s4", "s3"), synced)
+        val copied = vm.essays.value.first { it.id == "e25" }.blocks.filterIsInstance<EssayBlock.Paragraph>().map { it.text }.filter { it.isNotEmpty() }
+        assertEquals(listOf(SampleData.essays.first { it.id == "e25" }.previewText, "读书时的停顿也是阅读的一部分", "Relay 这个名字像接力，东西从手机交给电脑"), copied)
     }
 
     @Test
@@ -39,7 +52,8 @@ class LeafViewModelTest {
     @Test
     fun should_restore_deleted_scribbles_when_undoing() {
         val vm = vm()
-        val removed = vm.delete(setOf("s1", "s2"))
+        var removed = emptyList<Scribble>()
+        vm.delete(setOf("s1", "s2")) { removed = it }
         assertTrue(vm.scribbles.value.none { it.id == "s1" })
         vm.restore(removed)
         assertTrue(vm.scribbles.value.any { it.id == "s1" } && vm.scribbles.value.any { it.id == "s2" })
@@ -48,17 +62,20 @@ class LeafViewModelTest {
     @Test
     fun should_ignore_blank_text_when_adding_a_scribble_without_a_photo() {
         val vm = vm()
-        assertNull(vm.addScribble("   ", NotionColor.Default))
-        assertEquals("新的一句", vm.addScribble(" 新的一句 ", NotionColor.Green)?.text)
+        var added: Scribble? = null
+        vm.addScribble("   ", NotionColor.Default) { added = it }
+        assertNull(added)
+        vm.addScribble(" 新的一句 ", NotionColor.Green) { added = it }
+        assertEquals("新的一句", added?.text)
     }
 
     @Test
     fun should_keep_sort_and_drop_selection_when_reopening_the_wall_on_another_chip() {
         val vm = vm()
         vm.openWall("s1", emptySet())
-        vm.setSort(dev.chenwuyi.leaf.data.WallSort.Color)
+        vm.setSort(WallSort.Color)
         vm.openWall("s2", setOf("s3"))
-        assertEquals(dev.chenwuyi.leaf.data.WallSort.Color, vm.wall.value?.sort)
+        assertEquals(WallSort.Color, vm.wall.value?.sort)
         assertEquals("s2", vm.wall.value?.focusId)
     }
 }

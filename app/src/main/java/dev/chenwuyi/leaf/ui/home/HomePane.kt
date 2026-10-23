@@ -1,6 +1,7 @@
 package dev.chenwuyi.leaf.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,6 +48,7 @@ fun HomePane(
     onQuery: (String) -> Unit,
     onOpenWall: (focusId: String?, near: Set<String>) -> Unit,
     onOpenEssay: (String) -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.surface)) {
@@ -62,7 +64,7 @@ fun HomePane(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalItemSpacing = 10.dp,
         ) {
-            item(key = "search", span = StaggeredGridItemSpan.FullLine) { SearchBar(query, onQuery) }
+            item(key = "search", span = StaggeredGridItemSpan.FullLine) { SearchBar(query, onQuery, onOpenSettings) }
             item(key = "strip", span = StaggeredGridItemSpan.FullLine) { ScribbleStrip(scribbles, onOpenWall) }
             item(key = "essays-title", span = StaggeredGridItemSpan.FullLine) {
                 Text("随笔", Modifier.padding(start = 6.dp, top = 8.dp), style = MaterialTheme.typography.headlineMedium)
@@ -85,7 +87,7 @@ fun HomePane(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SearchBar(query: String, onQuery: (String) -> Unit) {
+private fun SearchBar(query: String, onQuery: (String) -> Unit, onOpenSettings: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(26.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(start = 18.dp, end = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -103,9 +105,10 @@ private fun SearchBar(query: String, onQuery: (String) -> Unit) {
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             )
         }
-        // Leaf's mark, the cookie shape, where an avatar would sit. Settings will open from here.
+        // Leaf's mark, the cookie shape, where an avatar would sit. Settings open from here.
         androidx.compose.foundation.layout.Box(
-            Modifier.size(34.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(MaterialTheme.colorScheme.primaryContainer),
+            Modifier.size(34.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(MaterialTheme.colorScheme.primaryContainer)
+                .clickable(onClickLabel = "设置", onClick = onOpenSettings),
             contentAlignment = Alignment.Center,
         ) {
             Text("L", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
