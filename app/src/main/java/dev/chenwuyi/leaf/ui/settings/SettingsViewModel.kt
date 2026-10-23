@@ -5,9 +5,13 @@ import androidx.lifecycle.viewModelScope
 import dev.chenwuyi.leaf.data.notion.DataSourceInfo
 import dev.chenwuyi.leaf.data.notion.NotionException
 import dev.chenwuyi.leaf.data.settings.Connection
+import dev.chenwuyi.leaf.data.settings.MemoryRelayStore
+import dev.chenwuyi.leaf.data.settings.RelayConnection
+import dev.chenwuyi.leaf.data.settings.RelayStore
 import dev.chenwuyi.leaf.data.sync.NotionSetup
 import dev.chenwuyi.leaf.data.sync.SyncStatus
 import java.io.IOException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,9 +30,32 @@ class SettingsViewModel(
     val status: StateFlow<SyncStatus>,
     private val syncNow: () -> Unit,
     private val afterDisconnect: suspend () -> Unit,
+    private val relay: RelayStore = MemoryRelayStore(),
 ) : ViewModel() {
     private val stepState = MutableStateFlow<ConnectStep>(ConnectStep.Token())
     val step: StateFlow<ConnectStep> = stepState.asStateFlow()
+
+    /** The Relay used for 按住说, by host; null when none is saved. */
+    val relayHost: StateFlow<String?> = relay.host
+    private val relayErrorState = MutableStateFlow<String?>(null)
+    val relayError: StateFlow<String?> = relayErrorState.asStateFlow()
+
+    /** Takes Sheaf's Relay connection string; returns whether it was saved. */
+    fun saveRelay(text: String): Boolean {
+        val parsed = RelayConnection.parse(text)
+        if (parsed == null) {
+            relayErrorState.value = "看不懂这个连接串：在 Sheaf 的「接力」里复制，形如 https://…/#token=…"
+            return false
+        }
+        relayErrorState.value = null
+        viewModelScope.launch(Dispatchers.IO) { relay.save(parsed) }
+        return true
+    }
+
+    fun clearRelay() {
+        relayErrorState.value = null
+        viewModelScope.launch(Dispatchers.IO) { relay.clear() }
+    }
 
     fun discover(token: String) {
         if (token.isBlank()) return

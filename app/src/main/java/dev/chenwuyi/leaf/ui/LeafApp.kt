@@ -32,6 +32,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chenwuyi.leaf.data.PaneLayout
@@ -48,6 +50,9 @@ import dev.chenwuyi.leaf.data.WallRules
 import dev.chenwuyi.leaf.data.paneLayout
 import dev.chenwuyi.leaf.ui.capture.Capture
 import dev.chenwuyi.leaf.ui.capture.CaptureSheet
+import dev.chenwuyi.leaf.ui.capture.VoiceSession
+import dev.chenwuyi.leaf.ui.capture.canRecord
+import dev.chenwuyi.leaf.data.voice.VoiceRecognizers
 import dev.chenwuyi.leaf.ui.component.LocalSharedTransitionScope
 import dev.chenwuyi.leaf.ui.component.LocalWallVisibilityScope
 import dev.chenwuyi.leaf.ui.essay.EssayEditor
@@ -86,6 +91,10 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
 
     var menuOpen by remember { mutableStateOf(false) }
     var capture by remember { mutableStateOf<Capture?>(null) }
+    val context = LocalContext.current
+    val voice = remember { VoiceSession(VoiceRecognizers.forScribbles(context), scope) }
+    // Closing the sheet, or switching it to text or a photo, drops a take still recording.
+    LaunchedEffect(capture) { if (capture != Capture.Voice) voice.cancel() }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) capture = Capture.Photo(Picture.Local(uri.toString()))
     }
@@ -144,7 +153,17 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                 listContent = { m ->
                                     Box(m) {
                                         HomePane(scribbles, essays, query, openId, vm::setQuery, vm::openWall, vm::openEssay, { settingsOpen = true }, Modifier.fillMaxSize())
-                                        AddMenu(menuOpen, { menuOpen = it }, onAdd, onLongPress = { capture = Capture.Voice })
+                                        AddMenu(
+                                            menuOpen,
+                                            { menuOpen = it },
+                                            onAdd,
+                                            onHoldStart = {
+                                                capture = Capture.Voice
+                                                // Without the permission the sheet opens and its mic asks first.
+                                                if (context.canRecord()) voice.press()
+                                            },
+                                            onHoldEnd = voice::lift,
+                                        )
                                     }
                                 },
                                 editor = openEssay?.let { e ->
@@ -158,6 +177,7 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
         }
         CaptureSheet(
             capture,
+            voice,
             onDismiss = { capture = null },
             onSave = { text, color, photo ->
                 capture = null
