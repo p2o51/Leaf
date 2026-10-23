@@ -10,6 +10,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,11 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
@@ -109,6 +115,13 @@ fun AddMenu(
                         // Without a finger to hold, a long press only opens the voice sheet; its mic does the rest.
                         onLongClick("语音") { onExpandedChange(false); onPick(AddKind.Voice); true }
                     }
+                    // Keyboard and D-pad: the custom gesture below handles touch only, so Enter opens the menu.
+                    .onKeyEvent { event ->
+                        val activates = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.Spacebar
+                        if (activates && event.type == KeyEventType.KeyUp) onExpandedChange(!expanded)
+                        activates
+                    }
+                    .focusable()
                     .holdToTalk(
                         onHoldStart = {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)

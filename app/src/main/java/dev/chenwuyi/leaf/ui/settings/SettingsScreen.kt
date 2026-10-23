@@ -170,7 +170,7 @@ private fun RelaySection(vm: SettingsViewModel) {
                 )
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-            Button(onClick = { if (vm.saveRelay(text)) text = "" }, enabled = text.isNotBlank()) { Text("保存") }
+            Button(onClick = { vm.saveRelay(text) { text = "" } }, enabled = text.isNotBlank()) { Text("保存") }
         }
     }
 }

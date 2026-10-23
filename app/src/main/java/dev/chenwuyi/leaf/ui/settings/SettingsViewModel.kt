@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** The connect flow: paste a token, pick a database, done. */
 sealed interface ConnectStep {
@@ -40,21 +41,30 @@ class SettingsViewModel(
     private val relayErrorState = MutableStateFlow<String?>(null)
     val relayError: StateFlow<String?> = relayErrorState.asStateFlow()
 
-    /** Takes Sheaf's Relay connection string; returns whether it was saved. */
-    fun saveRelay(text: String): Boolean {
+    /** Takes Sheaf's Relay connection string; [onSaved] runs only once it is in the vault. */
+    fun saveRelay(text: String, onSaved: () -> Unit) {
         val parsed = RelayConnection.parse(text)
         if (parsed == null) {
             relayErrorState.value = "看不懂这个连接串：在 Sheaf 的「接力」里复制，形如 https://…/#token=…"
-            return false
+            return
         }
         relayErrorState.value = null
-        viewModelScope.launch(Dispatchers.IO) { relay.save(parsed) }
-        return true
+        viewModelScope.launch {
+            // The vault writes to disk through the Keystore; a full disk or a broken key is a line, not a crash.
+            val saved = withContext(Dispatchers.IO) { runCatching { relay.save(parsed) } }
+            if (saved.isSuccess) {
+                onSaved()
+            } else {
+                relayErrorState.value = "没存上，稍后再试一次"
+            }
+        }
     }
 
     fun clearRelay() {
         relayErrorState.value = null
-        viewModelScope.launch(Dispatchers.IO) { relay.clear() }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { relay.clear() } }
+        }
     }
 
     fun discover(token: String) {
