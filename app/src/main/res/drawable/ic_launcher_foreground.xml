@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A single leaf on the lime container: the whole of Leaf's mark. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M72,34C52,34 36,46 36,64c0,4 1,7 2,10l-4,6 4,2 4,-6c3,2 7,3 12,3 18,0 26,-16 26,-34 0,-4 -1,-8 -2,-11zM45,71c6,-12 14,-20 25,-27 -9,8 -16,16 -22,29z" />
+</vector>
