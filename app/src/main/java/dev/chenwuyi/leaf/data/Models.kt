@@ -26,10 +26,11 @@ enum class NotionColor(val apiName: String, val label: String) {
     }
 }
 
-/** A picture is either one of the bundled sample artworks (demo data) or an image the user picked. */
+/** A bundled sample artwork (demo data), an image on this device, or an image in Notion (signed URL). */
 sealed interface Picture {
     data class Sample(val art: SampleArt) : Picture
     data class Local(val uri: String) : Picture
+    data class Remote(val url: String) : Picture
 }
 
 enum class SampleArt { Marble, Street, Moss, Dusk, Paper }
@@ -46,7 +47,19 @@ data class Scribble(
 sealed interface EssayBlock {
     val id: String
 
-    data class Paragraph(override val id: String, val text: String) : EssayBlock
+    /**
+     * A text block. [type] is Notion's block type (paragraph, heading_2, quote, …); Leaf edits the text
+     * and keeps the type. A coloured paragraph is how 复制到随笔 writes a scribble into an essay.
+     */
+    data class Paragraph(
+        override val id: String,
+        val text: String,
+        val type: String = "paragraph",
+        val color: NotionColor = NotionColor.Default,
+    ) : EssayBlock
+
+    /** A Notion block Leaf does not edit (table, embed, database…). Shown as a card, left untouched. */
+    data class Other(override val id: String, val type: String) : EssayBlock
 
     /** A copy of a scribble's synced block: it always renders from the live scribble. */
     data class SyncedScribble(override val id: String, val scribbleId: String) : EssayBlock
@@ -61,7 +74,9 @@ data class Essay(
     val cover: Picture?,
     val pinned: Boolean,
     val editedAt: Instant,
+    /** The card's text before the body is loaded from Notion. */
+    val storedPreview: String = "",
 ) {
     val previewText: String
-        get() = blocks.filterIsInstance<EssayBlock.Paragraph>().joinToString(" ") { it.text }.trim()
+        get() = blocks.filterIsInstance<EssayBlock.Paragraph>().joinToString(" ") { it.text }.trim().ifEmpty { storedPreview }
 }

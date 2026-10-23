@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.EssayBlock
+import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.WallRules
 import dev.chenwuyi.leaf.ui.component.PictureView
@@ -49,13 +50,13 @@ import java.time.ZoneId
  * editor (markdown shortcuts, drag to reorder, the insert menu and the drag-in rail) is M2.
  */
 @Composable
-fun EssayEditor(essay: Essay, scribbles: List<Scribble>, onBack: () -> Unit, onChange: (Essay) -> Unit, modifier: Modifier = Modifier) {
+fun EssayEditor(essay: Essay, scribbles: List<Scribble>, status: String, onBack: () -> Unit, onChange: (Essay) -> Unit, modifier: Modifier = Modifier) {
     val byId = scribbles.associateBy { it.id }
     Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest).statusBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
             Text(
-                "示例数据，还没连 Notion",
+                status,
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -79,10 +80,22 @@ fun EssayEditor(essay: Essay, scribbles: List<Scribble>, onBack: () -> Unit, onC
                 }
                 items(essay.blocks, key = { it.id }) { block ->
                     when (block) {
-                        is EssayBlock.Paragraph -> PlainField(block.text, "", EditorBodyStyle) { text ->
-                            onChange(essay.copy(blocks = essay.blocks.map { if (it.id == block.id) block.copy(text = text) else it }))
+                        is EssayBlock.Paragraph -> {
+                            val tinted = block.color != NotionColor.Default
+                            val style = if (block.type.startsWith("heading")) EditorTitleStyle.copy(fontSize = EditorTitleStyle.fontSize * 0.8f) else EditorBodyStyle
+                            Box(if (tinted) Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(LocalNotionTones.current.fill(block.color)).padding(horizontal = 14.dp, vertical = 8.dp) else Modifier) {
+                                PlainField(block.text, "", style) { text ->
+                                    onChange(essay.copy(blocks = essay.blocks.map { if (it.id == block.id) block.copy(text = text) else it }))
+                                }
+                            }
                         }
                         is EssayBlock.SyncedScribble -> SyncedScribbleBlock(byId[block.scribbleId])
+                        is EssayBlock.Other -> Text(
+                            "Notion 里的「${block.type}」块，Leaf 先不改它",
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }

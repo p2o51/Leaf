@@ -44,16 +44,16 @@ class WallRulesTest {
     }
 
     @Test
-    fun should_append_synced_blocks_oldest_first_with_blank_paragraphs_when_copying_into_an_essay() {
+    fun should_append_coloured_copies_oldest_first_with_blank_paragraphs_when_copying_into_an_essay() {
         var n = 0
         val essay = Essay("e", "t", listOf(EssayBlock.Paragraph("p0", "hello")), NotionColor.Default, null, false, Instant.EPOCH)
-        val out = WallRules.copyInto(essay, listOf(s("late", "l", 5), s("early", "e", 1)), Instant.EPOCH) { "id${n++}" }
+        val out = WallRules.copyInto(essay, listOf(s("late", "l", 5, NotionColor.Red), s("early", "e", 1)), Instant.EPOCH) { "id${n++}" }
         assertEquals("e", out.id)
         assertEquals(5, out.blocks.size)
         assertEquals("p0", out.blocks[0].id)
-        assertEquals("early", (out.blocks[1] as EssayBlock.SyncedScribble).scribbleId)
+        assertEquals("e", (out.blocks[1] as EssayBlock.Paragraph).text)
         assertEquals("", (out.blocks[2] as EssayBlock.Paragraph).text)
-        assertEquals("late", (out.blocks[3] as EssayBlock.SyncedScribble).scribbleId)
+        assertEquals(EssayBlock.Paragraph("id2", "l", color = NotionColor.Red), out.blocks[3])
     }
 
     @Test

@@ -18,6 +18,7 @@ import dev.chenwuyi.leaf.data.SampleArt
 fun PictureView(picture: Picture, modifier: Modifier = Modifier) {
     when (picture) {
         is Picture.Local -> AsyncImage(model = picture.uri, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
+        is Picture.Remote -> AsyncImage(model = picture.url, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
         is Picture.Sample -> SampleArtView(picture.art, modifier)
     }
 }
