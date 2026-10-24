@@ -5,14 +5,19 @@ import androidx.lifecycle.viewModelScope
 import dev.chenwuyi.leaf.data.notion.DataSourceInfo
 import dev.chenwuyi.leaf.data.notion.NotionException
 import dev.chenwuyi.leaf.data.settings.Connection
+import dev.chenwuyi.leaf.data.settings.MemoryRelayStore
+import dev.chenwuyi.leaf.data.settings.RelayConnection
+import dev.chenwuyi.leaf.data.settings.RelayStore
 import dev.chenwuyi.leaf.data.sync.NotionSetup
 import dev.chenwuyi.leaf.data.sync.SyncStatus
 import java.io.IOException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** The connect flow: paste a token, pick a database, done. */
 sealed interface ConnectStep {
@@ -26,9 +31,41 @@ class SettingsViewModel(
     val status: StateFlow<SyncStatus>,
     private val syncNow: () -> Unit,
     private val afterDisconnect: suspend () -> Unit,
+    private val relay: RelayStore = MemoryRelayStore(),
 ) : ViewModel() {
     private val stepState = MutableStateFlow<ConnectStep>(ConnectStep.Token())
     val step: StateFlow<ConnectStep> = stepState.asStateFlow()
+
+    /** The Relay used for 按住说, by host; null when none is saved. */
+    val relayHost: StateFlow<String?> = relay.host
+    private val relayErrorState = MutableStateFlow<String?>(null)
+    val relayError: StateFlow<String?> = relayErrorState.asStateFlow()
+
+    /** Takes Sheaf's Relay connection string; [onSaved] runs only once it is in the vault. */
+    fun saveRelay(text: String, onSaved: () -> Unit) {
+        val parsed = RelayConnection.parse(text)
+        if (parsed == null) {
+            relayErrorState.value = "看不懂这个连接串：在 Sheaf 的「接力」里复制，形如 https://…/#token=…"
+            return
+        }
+        relayErrorState.value = null
+        viewModelScope.launch {
+            // The vault writes to disk through the Keystore; a full disk or a broken key is a line, not a crash.
+            val saved = withContext(Dispatchers.IO) { runCatching { relay.save(parsed) } }
+            if (saved.isSuccess) {
+                onSaved()
+            } else {
+                relayErrorState.value = "没存上，稍后再试一次"
+            }
+        }
+    }
+
+    fun clearRelay() {
+        relayErrorState.value = null
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { relay.clear() } }
+        }
+    }
 
     fun discover(token: String) {
         if (token.isBlank()) return

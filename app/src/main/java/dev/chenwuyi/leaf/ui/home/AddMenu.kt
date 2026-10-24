@@ -8,10 +8,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +38,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.ui.capture.holdToTalk
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 
 enum class AddKind(val label: String, val hint: String, val icon: ImageVector) {
@@ -51,11 +63,18 @@ enum class AddKind(val label: String, val hint: String, val icon: ImageVector) {
 
 /**
  * The one + button. Tap opens the choice of what to make (photo, voice and text all become scribbles;
- * 随笔 is a whole essay). Long-press skips the menu and starts talking.
+ * 随笔 is a whole essay). Holding it skips the menu and records until the finger lifts: [onHoldStart]
+ * opens the voice sheet and starts listening, [onHoldEnd] ends the take.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun AddMenu(expanded: Boolean, onExpandedChange: (Boolean) -> Unit, onPick: (AddKind) -> Unit, onLongPress: () -> Unit, modifier: Modifier = Modifier) {
+fun AddMenu(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onPick: (AddKind) -> Unit,
+    onHoldStart: () -> Unit,
+    onHoldEnd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Box(modifier.fillMaxSize()) {
         AnimatedVisibility(expanded, enter = fadeIn(), exit = fadeOut()) {
             Box(
@@ -79,6 +98,7 @@ fun AddMenu(expanded: Boolean, onExpandedChange: (Boolean) -> Unit, onPick: (Add
                     MenuItem(kind) { onExpandedChange(false); onPick(kind) }
                 }
             }
+            val haptics = LocalHapticFeedback.current
             val rotation by animateFloatAsState(if (expanded) 45f else 0f, LeafMotion.fast(), label = "plus")
             val corner by androidx.compose.animation.core.animateDpAsState(if (expanded) 38.dp else 26.dp, LeafMotion.fast(), label = "corner")
             val container = if (expanded) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.tertiaryContainer
@@ -89,11 +109,27 @@ fun AddMenu(expanded: Boolean, onExpandedChange: (Boolean) -> Unit, onPick: (Add
                     .size(76.dp)
                     .clip(RoundedCornerShape(corner))
                     .background(container)
-                    .combinedClickable(
-                        onClickLabel = "新建",
-                        onLongClickLabel = "按住说",
-                        onClick = { onExpandedChange(!expanded) },
-                        onLongClick = { onExpandedChange(false); onLongPress() },
+                    .semantics {
+                        role = Role.Button
+                        onClick("新建") { onExpandedChange(!expanded); true }
+                        // Without a finger to hold, a long press only opens the voice sheet; its mic does the rest.
+                        onLongClick("语音") { onExpandedChange(false); onPick(AddKind.Voice); true }
+                    }
+                    // Keyboard and D-pad: the custom gesture below handles touch only, so Enter opens the menu.
+                    .onKeyEvent { event ->
+                        val activates = event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter || event.key == Key.Spacebar
+                        if (activates && event.type == KeyEventType.KeyUp) onExpandedChange(!expanded)
+                        activates
+                    }
+                    .focusable()
+                    .holdToTalk(
+                        onHoldStart = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onExpandedChange(false)
+                            onHoldStart()
+                        },
+                        onHoldEnd = onHoldEnd,
+                        onTap = { onExpandedChange(!expanded) },
                     ),
                 contentAlignment = Alignment.Center,
             ) {

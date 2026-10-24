@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
                         status = container.sync.status,
                         syncNow = container.scheduler::now,
                         afterDisconnect = container.repository::seedSamplesIfEmpty,
+                        relay = container.relay,
                     )
                 }
                 LeafApp(vm, settings)

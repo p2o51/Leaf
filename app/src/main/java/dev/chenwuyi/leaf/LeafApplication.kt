@@ -7,9 +7,11 @@ import dev.chenwuyi.leaf.data.local.PhotoStore
 import dev.chenwuyi.leaf.data.local.RoomLeafRepository
 import dev.chenwuyi.leaf.data.notion.LeafNotion
 import dev.chenwuyi.leaf.data.settings.PrefsConnectionStore
+import dev.chenwuyi.leaf.data.settings.VaultRelayStore
 import dev.chenwuyi.leaf.data.sync.NotionSetup
 import dev.chenwuyi.leaf.data.sync.SyncEngine
 import dev.chenwuyi.leaf.data.sync.SyncScheduler
+import dev.chenwuyi.leaf.data.voice.ScribeTranscriber
 
 class LeafApplication : Application() {
     lateinit var container: AppContainer
@@ -26,6 +28,8 @@ class AppContainer(context: Context) {
     private val database = LeafDatabase.open(context)
     private val photos = PhotoStore(context)
     val connection = PrefsConnectionStore(context)
+    val relay = VaultRelayStore(context)
+    val transcriber = ScribeTranscriber()
     private val notion = LeafNotion()
     val sync = SyncEngine(database.dao(), notion, connection, readPhoto = photos::read, downloadPhoto = photos::download)
     val scheduler = SyncScheduler(context)

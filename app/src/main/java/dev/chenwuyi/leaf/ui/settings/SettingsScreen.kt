@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chenwuyi.leaf.data.notion.DataSourceInfo
 
-/** Quiet tool page: the Notion connection and nothing else for now. */
+/** Quiet tool page: the Notion connection and where 按住说 transcribes. */
 @Composable
 fun SettingsScreen(vm: SettingsViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val connection by vm.connection.collectAsStateWithLifecycle()
@@ -81,6 +81,8 @@ fun SettingsScreen(vm: SettingsViewModel, onClose: () -> Unit, modifier: Modifie
                         }
                     }
                 }
+                item { Text("语音转写", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp)) }
+                item { RelaySection(vm) }
             }
         }
     }
@@ -133,6 +135,42 @@ private fun SourceRow(source: DataSourceInfo, enabled: Boolean, onClick: () -> U
         Column(Modifier.weight(1f)) {
             Text(source.name, style = MaterialTheme.typography.titleMedium)
             Text("${source.properties.size} 个字段", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun RelaySection(vm: SettingsViewModel) {
+    val host by vm.relayHost.collectAsStateWithLifecycle()
+    val error by vm.relayError.collectAsStateWithLifecycle()
+    var text by rememberSaveable { mutableStateOf("") }
+    Section {
+        val saved = host
+        if (saved != null) {
+            Text("经 Relay（$saved）", style = MaterialTheme.typography.titleMedium)
+            Text("按住说的录音经 Relay 交给 ElevenLabs 转写，密钥只在 Relay 上。断网时改用这台设备的系统识别。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = vm::clearRelay) { Text("不用 Relay") }
+        } else {
+            Text("现在用这台设备的系统识别", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "想用 ElevenLabs 转写（中英混说更准），把 Sheaf「接力」里的连接串贴在下面。它只存在这台设备的加密存储里。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(horizontal = 16.dp, vertical = 14.dp)) {
+                if (text.isEmpty()) Text("https://…/#token=…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                BasicTextField(
+                    text,
+                    { text = it },
+                    Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                )
+            }
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            Button(onClick = { vm.saveRelay(text) { text = "" } }, enabled = text.isNotBlank()) { Text("保存") }
         }
     }
 }

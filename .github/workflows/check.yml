@@ -25,6 +25,12 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      # Debug and release KSP both write app/schemas; run in parallel on a fresh checkout they race and
+      # one reads the other's half-written JSON. Generating it once first leaves the second with nothing to write.
+      - name: room schema
+        run: |
+          ./gradlew --console=plain kspDebugKotlin
+          find app/schemas -name '*.json' -exec sh -c 'echo "== $1"; cat "$1"' _ {} \;
       - name: build and unit tests
         run: ./gradlew --console=plain assembleDebug testDebugUnitTest assembleRelease
       - name: test counts
@@ -47,3 +53,7 @@ jobs:
         with:
           name: leaf-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: leaf-release-apk-debug-signed
+          path: app/build/outputs/apk/release/*.apk

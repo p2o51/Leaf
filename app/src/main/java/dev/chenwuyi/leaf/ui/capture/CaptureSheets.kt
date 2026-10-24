@@ -41,11 +41,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Picture
+import dev.chenwuyi.leaf.data.voice.joinTranscript
 import dev.chenwuyi.leaf.ui.component.ColorDots
 import dev.chenwuyi.leaf.ui.component.PictureView
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 
-/** What the bottom sheet is capturing. Voice is typed for now: transcription arrives in M1 with Relay. */
+/** What the bottom sheet is capturing. Voice is a scribble too: its words land in the same field, to edit before saving. */
 sealed interface Capture {
     data object Text : Capture
     data object Voice : Capture
@@ -54,7 +55,7 @@ sealed interface Capture {
 
 /** One sheet for every way of adding a scribble: a line of text, a colour, and for photos the picture and a caption. */
 @Composable
-fun CaptureSheet(capture: Capture?, onDismiss: () -> Unit, onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit) {
+fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit) {
     Box(Modifier.fillMaxSize()) {
         AnimatedVisibility(capture != null, enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).clickable(interactionSource = null, indication = null, onClick = onDismiss))
@@ -68,20 +69,29 @@ fun CaptureSheet(capture: Capture?, onDismiss: () -> Unit, onSave: (text: String
             // Keep the last capture while the sheet slides away.
             var shown by remember { mutableStateOf<Capture>(Capture.Text) }
             if (capture != null) shown = capture
-            SheetBody(shown, onSave)
+            SheetBody(shown, voice, onSave)
         }
     }
 }
 
 @Composable
-private fun SheetBody(capture: Capture, onSave: (String, NotionColor, Picture?) -> Unit) {
+private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, NotionColor, Picture?) -> Unit) {
     var text by rememberSaveable(capture) { mutableStateOf("") }
     var color by rememberSaveable(capture) { mutableStateOf(NotionColor.Default) }
     val focus = remember { FocusRequester() }
     val photo = (capture as? Capture.Photo)?.picture
     val canSave = text.isNotBlank() || photo != null
     val save = { if (canSave) onSave(text, color, photo) }
-    LaunchedEffect(capture) { if (photo == null) focus.requestFocus() }
+    val isVoice = capture == Capture.Voice
+    // Voice keeps the keyboard down: the hands are on the mic, and the field is only for fixing words.
+    LaunchedEffect(capture) { if (photo == null && !isVoice) focus.requestFocus() }
+    val heard = voice.state as? VoiceState.Heard
+    LaunchedEffect(heard?.take) {
+        if (heard != null) {
+            text = joinTranscript(text, heard.text)
+            voice.taken()
+        }
+    }
 
     Column(
         Modifier
@@ -96,7 +106,7 @@ private fun SheetBody(capture: Capture, onSave: (String, NotionColor, Picture?) 
         Text(
             when (capture) {
                 Capture.Text -> "记一条涂鸦"
-                Capture.Voice -> "说一句（转写在下一步接上，先打字）"
+                Capture.Voice -> "说一句"
                 is Capture.Photo -> "这张照片记成涂鸦"
             },
             style = MaterialTheme.typography.titleMedium,
@@ -107,10 +117,21 @@ private fun SheetBody(capture: Capture, onSave: (String, NotionColor, Picture?) 
         Box(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(horizontal = 18.dp, vertical = 14.dp),
         ) {
-            if (text.isEmpty()) {
-                Text(if (photo != null) "配一句话（可以不写）" else "想到什么写什么", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val live = (voice.state as? VoiceState.Listening)?.text ?: (voice.state as? VoiceState.Finishing)?.text
+            if (isVoice && !live.isNullOrEmpty()) {
+                // What the system recognizer hears while held, after anything already in the field.
+                Text(joinTranscript(text, live), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (text.isEmpty()) {
+                Text(
+                    when {
+                        photo != null -> "配一句话（可以不写）"
+                        isVoice -> "说的话会出现在这里，可以改"
+                        else -> "想到什么写什么"
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            BasicTextField(
+            if (!(isVoice && !live.isNullOrEmpty())) BasicTextField(
                 text,
                 { text = it },
                 Modifier.fillMaxWidth().focusRequester(focus),
@@ -121,8 +142,12 @@ private fun SheetBody(capture: Capture, onSave: (String, NotionColor, Picture?) 
             )
         }
         if (photo == null) ColorDots(color, { color = it })
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Button(onClick = save, enabled = canSave) { Text("记下") }
+        if (isVoice) {
+            VoiceControls(voice, canSave, save)
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(onClick = save, enabled = canSave) { Text("记下") }
+            }
         }
     }
 }
