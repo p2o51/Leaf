@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -187,7 +189,8 @@ private fun SearchResults(query: String, scribbles: List<Scribble>, essays: List
     if (query.isBlank()) return
     val hitScribbles = WallRules.search(scribbles, query).sortedByDescending { it.createdAt }
     val hitEssays = WallRules.searchEssays(essays, query)
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    // A centred reading width on tablets, rather than results stretched across the whole screen.
+    LazyColumn(Modifier.fillMaxSize().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (hitScribbles.isEmpty() && hitEssays.isEmpty()) {
             item(key = "none") { Text("没有找到「${query.trim()}」", Modifier.padding(8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }

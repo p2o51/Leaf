@@ -24,9 +24,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -86,15 +87,20 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
     val groups = remember(scribbles, state.sort) { WallRules.groups(scribbles, state.sort) }
     // Start with the tapped scribble's group in view, so its chip lands near the middle of the screen.
     val focusGroup = state.focusId?.let { id -> groups.indexOfFirst { g -> g.scribbles.any { it.id == id } } } ?: -1
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (focusGroup - 1).coerceAtLeast(0))
+    val listState = rememberLazyGridState(initialFirstVisibleItemIndex = (focusGroup - 1).coerceAtLeast(0))
 
     Box(modifier.fillMaxSize().sharedKey("wall-surface").background(MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             TopBar(state, actions)
-            LazyColumn(
+            // One column on a phone; on wide windows the days sit side by side instead of one thin
+            // column with most of the screen empty. A plain grid, not a staggered one: days fill row by
+            // row, so they read left to right in date order rather than jumping between lanes.
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(340.dp),
                 state = listState,
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 120.dp),
+                horizontalArrangement = Arrangement.spacedBy(28.dp),
             ) {
                 items(groups, key = { it.key }) { g ->
                     Column(Modifier.padding(top = 14.dp)) {
