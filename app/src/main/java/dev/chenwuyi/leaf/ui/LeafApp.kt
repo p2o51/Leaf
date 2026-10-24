@@ -108,7 +108,7 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
         when (kind) {
             AddKind.Photo -> pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             AddKind.Voice -> capture = Capture.Voice
-            AddKind.Text -> capture = Capture.Text
+            AddKind.Text -> capture = Capture.Text()
             AddKind.Essay -> vm.newEssay()
         }
     }

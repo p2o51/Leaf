@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget and shortcut icons draw outside Compose, so they carry Leaf's scheme as resources (Color.kt). -->
+<resources>
+    <color name="widget_surface">#F3F7E7</color>
+    <color name="widget_line">#FCFDF6</color>
+    <color name="widget_on_surface">#17200E</color>
+    <color name="widget_on_surface_variant">#56624A</color>
+    <color name="widget_primary_container">#C6F36A</color>
+    <color name="widget_on_primary_container">#102000</color>
+</resources>

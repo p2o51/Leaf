@@ -50,7 +50,7 @@ class RoomLeafRepository(
     }
 
     override suspend fun addScribble(text: String, color: NotionColor, photo: Picture?): Scribble {
-        val stored = (photo as? Picture.Local)?.let { importPhoto(it.uri)?.let(Picture::Local) } ?: photo
+        val stored = (photo as? Picture.Local)?.let { withContext(Dispatchers.IO) { importPhoto(it.uri) }?.let(Picture::Local) } ?: photo
         val s = Scribble(newId(), text.trim(), color, clock(), stored)
         dao.upsertScribbles(listOf(s.toEntity()))
         queue(OutboxOp.SaveScribble, s.id)

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the launcher icon: the two quick ways to add a scribble. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_write"
+        android:shortcutId="write"
+        android:shortcutLongLabel="@string/quick_write_long"
+        android:shortcutShortLabel="@string/quick_write">
+        <intent
+            android:action="dev.chenwuyi.leaf.action.WRITE"
+            android:targetClass="dev.chenwuyi.leaf.quick.QuickCaptureActivity"
+            android:targetPackage="dev.chenwuyi.leaf" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_speak"
+        android:shortcutId="speak"
+        android:shortcutLongLabel="@string/quick_speak_long"
+        android:shortcutShortLabel="@string/quick_speak">
+        <intent
+            android:action="dev.chenwuyi.leaf.action.SPEAK"
+            android:targetClass="dev.chenwuyi.leaf.quick.QuickCaptureActivity"
+            android:targetPackage="dev.chenwuyi.leaf" />
+    </shortcut>
+</shortcuts>

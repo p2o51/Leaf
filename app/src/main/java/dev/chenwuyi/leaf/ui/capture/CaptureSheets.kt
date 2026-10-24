@@ -59,11 +59,16 @@ import dev.chenwuyi.leaf.ui.component.PictureView
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 import kotlinx.coroutines.delay
 
-/** What the bottom sheet is capturing. Voice is a scribble too: its words land in the same field, to edit before saving. */
+/**
+ * What the bottom sheet is capturing. Voice is a scribble too: its words land in the same field, to edit
+ * before saving. [initial] is text the field starts with, such as words shared from another app.
+ */
 sealed interface Capture {
-    data object Text : Capture
+    val initial: String get() = ""
+
+    data class Text(override val initial: String = "") : Capture
     data object Voice : Capture
-    data class Photo(val picture: Picture) : Capture
+    data class Photo(val picture: Picture, override val initial: String = "") : Capture
 }
 
 /** One sheet for every way of adding a scribble: a line of text, a colour, and for photos the picture and a caption. */
@@ -98,7 +103,7 @@ fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, 
             exit = slideOutVertically(LeafMotion.tool()) { it },
         ) {
             // Keep the last capture while the sheet slides away.
-            var shown by remember { mutableStateOf<Capture>(Capture.Text) }
+            var shown by remember { mutableStateOf<Capture>(Capture.Text()) }
             if (capture != null) shown = capture
             AnimatedContent(
                 targetState = done,
@@ -150,7 +155,7 @@ private fun SheetDone() {
 
 @Composable
 private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, NotionColor, Picture?) -> Unit) {
-    var text by rememberSaveable(capture) { mutableStateOf("") }
+    var text by rememberSaveable(capture) { mutableStateOf(capture.initial) }
     var color by rememberSaveable(capture) { mutableStateOf(NotionColor.Default) }
     val focus = remember { FocusRequester() }
     val photo = (capture as? Capture.Photo)?.picture
@@ -179,7 +184,7 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, No
     ) {
         Text(
             when (capture) {
-                Capture.Text -> "记一条涂鸦"
+                is Capture.Text -> "记一条涂鸦"
                 Capture.Voice -> "说一句"
                 is Capture.Photo -> "这张照片记成涂鸦"
             },
