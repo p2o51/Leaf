@@ -1,6 +1,11 @@
 package dev.chenwuyi.leaf.ui.wall
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -24,6 +29,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -129,13 +135,26 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
 
 @Composable
 private fun TopBar(state: WallState, actions: WallActions) {
+    // Entering and leaving selection changes the bar in place: the new row settles in from the start edge
+    // while the old one goes at once, so the two bars are never on screen together.
+    AnimatedContent(
+        targetState = state.selecting,
+        transitionSpec = { (fadeIn(LeafMotion.tool()) + slideInHorizontally(LeafMotion.expressive()) { -it / 8 }) togetherWith ExitTransition.None },
+        label = "wall bar",
+    ) { selecting ->
+        TopBarRow(state, selecting, actions)
+    }
+}
+
+@Composable
+private fun TopBarRow(state: WallState, selecting: Boolean, actions: WallActions) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (state.selecting) {
+        if (selecting) {
             IconButton(onClick = actions.stopSelecting) { Icon(Icons.Rounded.Close, "退出选择") }
             Text("已选 ${state.selected.size} 条", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
             Pill("全选", null, actions.selectAll)
         } else {
-            IconButton(onClick = actions.close) { Icon(Icons.Rounded.Close, "关闭涂鸦墙") }
+            IconButton(onClick = actions.close) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
             Text("涂鸦墙", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
             var sortOpen by remember { mutableStateOf(false) }
             Box {

@@ -1,6 +1,5 @@
 package dev.chenwuyi.leaf.ui.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,11 +23,18 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.WallRules
@@ -39,14 +44,18 @@ import dev.chenwuyi.leaf.ui.component.sharedScribble
 
 private const val DriftPxPerFrame = 0.5f
 private const val PauseAfterTouchMillis = 2500L
+private val EdgeFade = 28.dp
 
 /**
  * Home's scribble strip: three rows that drift sideways on their own, never more than a third of the
  * screen. Tapping a chip or the blank space opens the full wall; [onOpen] gets the tapped chip (if any)
  * and the chips around it that the finger may have meant.
+ *
+ * No panel behind it (51, 2026-10-24: "无缝的就好"): the strip reaches past the grid's [bleed] to the
+ * screen edges and its chips fade out there, so they drift in and out instead of being cut at a border.
  */
 @Composable
-fun ScribbleStrip(scribbles: List<Scribble>, onOpen: (focusId: String?, near: Set<String>) -> Unit, modifier: Modifier = Modifier) {
+fun ScribbleStrip(scribbles: List<Scribble>, onOpen: (focusId: String?, near: Set<String>) -> Unit, modifier: Modifier = Modifier, bleed: Dp = 0.dp) {
     val scroll = rememberScrollState()
     val dragged by scroll.interactionSource.collectIsDraggedAsState()
     val pausedUntil = remember { mutableLongStateOf(0L) }
@@ -72,20 +81,33 @@ fun ScribbleStrip(scribbles: List<Scribble>, onOpen: (focusId: String?, near: Se
     Column(
         modifier
             .fillMaxWidth()
+            .layout { measurable, constraints ->
+                val extra = (bleed * 2).roundToPx()
+                val width = constraints.maxWidth + extra
+                val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+            }
             .sharedKey("wall-surface")
-            .clip(RoundedCornerShape(28.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val fade = (EdgeFade.toPx() / size.width).coerceIn(0f, 0.5f)
+                drawRect(
+                    Brush.horizontalGradient(0f to Color.Transparent, fade to Color.Black, 1f - fade to Color.Black, 1f to Color.Transparent),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
             .clickable(interactionSource = null, indication = null) { onOpen(null, emptySet()) }
             .horizontalScroll(scroll)
             .padding(vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (scribbles.isEmpty()) {
-            Text("没有匹配的涂鸦", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text("还没有涂鸦", Modifier.padding(horizontal = bleed + 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         rows.forEachIndexed { index, row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.width(10.dp + 22.dp * index))
+                Spacer(Modifier.width(bleed + 10.dp + 22.dp * index))
                 row.forEach { s ->
                     ScribbleChip(
                         s,
@@ -96,7 +118,7 @@ fun ScribbleStrip(scribbles: List<Scribble>, onOpen: (focusId: String?, near: Se
                         onClick = { onOpen(s.id, neighboursOf(s.id, bounds, pad)) },
                     )
                 }
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(bleed + 10.dp))
             }
         }
     }

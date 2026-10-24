@@ -1,6 +1,11 @@
 package dev.chenwuyi.leaf.ui.capture
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -17,11 +22,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +47,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.data.NotionColor
@@ -45,6 +57,7 @@ import dev.chenwuyi.leaf.data.voice.joinTranscript
 import dev.chenwuyi.leaf.ui.component.ColorDots
 import dev.chenwuyi.leaf.ui.component.PictureView
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
+import kotlinx.coroutines.delay
 
 /** What the bottom sheet is capturing. Voice is a scribble too: its words land in the same field, to edit before saving. */
 sealed interface Capture {
@@ -56,12 +69,30 @@ sealed interface Capture {
 /** One sheet for every way of adding a scribble: a line of text, a colour, and for photos the picture and a caption. */
 @Composable
 fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit) {
+    // After 记下 the sheet stays a moment with a tick and 记下了, then slides away (Paw's SheetFinisher),
+    // instead of vanishing the instant the scribble is saved. The scribble itself is saved at once.
+    // [finishing] holds the sheet up for the pause; [done] keeps the tick shown through the slide away
+    // too, so the form (which would take focus and bring the keyboard back) never returns as it leaves.
+    var finishing by remember { mutableStateOf(false) }
+    var done by remember { mutableStateOf(false) }
+    LaunchedEffect(finishing) {
+        if (finishing) {
+            delay(LeafMotion.SheetFinishMillis)
+            finishing = false
+        }
+    }
+    // A new capture opens on the form, also when it comes during the pause.
+    if (capture != null && (done || finishing)) {
+        done = false
+        finishing = false
+    }
+    val visible = capture != null || finishing
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(capture != null, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).clickable(interactionSource = null, indication = null, onClick = onDismiss))
         }
         AnimatedVisibility(
-            capture != null,
+            visible,
             Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(LeafMotion.expressive()) { it },
             exit = slideOutVertically(LeafMotion.tool()) { it },
@@ -69,8 +100,51 @@ fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, 
             // Keep the last capture while the sheet slides away.
             var shown by remember { mutableStateOf<Capture>(Capture.Text) }
             if (capture != null) shown = capture
-            SheetBody(shown, voice, onSave)
+            AnimatedContent(
+                targetState = done,
+                // The form goes at once and the tick settles in as the sheet shrinks to it, so the two never overlap.
+                transitionSpec = { fadeIn(LeafMotion.tool()) togetherWith ExitTransition.None using SizeTransform { _, _ -> LeafMotion.expressive() } },
+                label = "sheet finish",
+            ) { finished ->
+                if (finished) {
+                    SheetDone()
+                } else {
+                    SheetBody(shown, voice) { text, color, photo ->
+                        finishing = true
+                        done = true
+                        onSave(text, color, photo)
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun SheetDone() {
+    val keyboard = LocalSoftwareKeyboardController.current
+    val pop = remember { Animatable(0.6f) }
+    LaunchedEffect(Unit) {
+        keyboard?.hide()
+        pop.animateTo(1f, LeafMotion.fast())
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 28.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(40.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value }.clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+        }
+        Text("记下了", style = MaterialTheme.typography.titleMedium)
     }
 }
 
