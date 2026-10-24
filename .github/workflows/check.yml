@@ -53,3 +53,7 @@ jobs:
         with:
           name: leaf-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: leaf-release-apk-debug-signed
+          path: app/build/outputs/apk/release/*.apk

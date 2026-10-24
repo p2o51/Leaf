@@ -19,6 +19,8 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Self-use for now: release builds carry the debug key so CI can hand out an installable APK.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
