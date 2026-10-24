@@ -25,13 +25,14 @@ import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
 @Composable
 fun ColorDots(selected: NotionColor?, onPick: (NotionColor) -> Unit, modifier: Modifier = Modifier) {
     val tones = LocalNotionTones.current
-    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // 28dp dots 6dp apart keep all ten on one line in a phone's sheet (the 30/8 they had wrapped the tenth).
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         NotionColor.entries.forEach { c ->
             val on = c == selected
-            val corner by animateDpAsState(if (on) 9.dp else 15.dp, LeafMotion.fast(), label = "dot")
+            val corner by animateDpAsState(if (on) 8.dp else 14.dp, LeafMotion.fast(), label = "dot")
             Box(
                 Modifier
-                    .size(30.dp)
+                    .size(28.dp)
                     .clip(RoundedCornerShape(corner))
                     .background(if (c == NotionColor.Default) MaterialTheme.colorScheme.surfaceContainerHighest else tones.fill(c))
                     .then(if (on) Modifier.background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)) else Modifier)

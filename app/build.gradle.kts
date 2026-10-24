@@ -14,6 +14,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        // The commit the APK was built from, shown in 设置 › 关于 so a bug report can name the exact build.
+        buildConfigField("String", "GIT_HASH", "\"${gitHash()}\"")
     }
 
     buildTypes {
@@ -31,6 +33,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
@@ -72,3 +75,8 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.okhttp.mockwebserver)
 }
+
+fun gitHash(): String =
+    runCatching {
+        providers.exec { commandLine("git", "rev-parse", "--short", "HEAD") }.standardOutput.asText.get().trim()
+    }.getOrDefault("").ifEmpty { "unknown" }

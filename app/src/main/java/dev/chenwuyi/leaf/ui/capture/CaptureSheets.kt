@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -93,7 +94,8 @@ fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, 
         }
         AnimatedVisibility(
             visible,
-            Modifier.align(Alignment.BottomCenter),
+            // Tablet windows keep the sheet at a writing width instead of stretching it edge to edge.
+            Modifier.align(Alignment.BottomCenter).widthIn(max = 640.dp),
             enter = slideInVertically(LeafMotion.expressive()) { it },
             exit = slideOutVertically(LeafMotion.tool()) { it },
         ) {
