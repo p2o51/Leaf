@@ -189,4 +189,29 @@ class SyncEngineTest {
         assertEquals(listOf("x1"), fake.children.getValue("p1").map { it.id })
         assertEquals(listOf("k1"), db.dao().blocksOf("e1").map { it.id })
     }
+
+    @Test
+    fun should_delete_the_new_notion_block_when_it_is_removed_while_being_created() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        fake.children["p1"] = mutableListOf()
+        val essay = repo.essays.first().single()
+        repo.updateEssay(essay.copy(blocks = essay.blocks + EssayBlock.Paragraph("k1", "写错了")))
+        fake.duringAppend = { runBlocking { repo.removeBlocks("e1", setOf("k1")) } }
+        engine.run(pull = false)
+        assertEquals(emptyList<String>(), fake.children.getValue("p1").map { it.id })
+        assertEquals(emptyList<String>(), db.dao().blocksOf("e1").map { it.id })
+    }
+
+    @Test
+    fun should_import_a_picked_photo_once_when_the_editor_keeps_sending_its_content_uri() = runBlocking {
+        var imports = 0
+        val photos = RoomLeafRepository(db.dao(), isConnected = { true }, requestSync = {}, importPhoto = { imports++; "file:///copy-$imports.jpg" })
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        val essay = photos.essays.first().single()
+        val picked = EssayBlock.Photo("i", dev.chenwuyi.leaf.data.Picture.Local("content://media/1"))
+        photos.updateEssay(essay.copy(blocks = listOf(picked)))
+        photos.updateEssay(essay.copy(title = "东京", blocks = listOf(picked)))
+        assertEquals(1, imports)
+        assertEquals("file:///copy-1.jpg", db.dao().blocksOf("e1").single().photo)
+    }
 }

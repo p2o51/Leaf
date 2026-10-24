@@ -132,7 +132,8 @@ class SyncEngine(
                 NotionJson.paragraph(row.text, color)
             }
             val created = notion.append(token, c.wallPageId, listOf(block)).firstOrNull() ?: return
-            dao.scribble(row.id)?.let { dao.upsertScribbles(listOf(it.copy(blockId = created.first))) }
+            val now = dao.scribble(row.id) ?: return notion.deleteBlock(token, created.first)
+            dao.upsertScribbles(listOf(now.copy(blockId = created.first)))
         } else if (isPhoto) {
             notion.updateBlock(token, blockId, NotionJson.captionUpdate(row.text))
         } else {
@@ -165,7 +166,9 @@ class SyncEngine(
                 NotionJson.textBlock(row.type, row.text, color)
             }
             val created = notion.append(token, pageId, listOf(block), after).firstOrNull() ?: return
-            dao.block(row.id)?.let { dao.upsertBlocks(listOf(it.copy(blockId = created.first))) }
+            // Removed while it was being created: its removal had no Notion ID to delete, so delete it here.
+            val now = dao.block(row.id) ?: return notion.deleteBlock(token, created.first)
+            dao.upsertBlocks(listOf(now.copy(blockId = created.first)))
         } else if (isImage) {
             notion.updateBlock(token, blockId, NotionJson.captionUpdate(row.text))
         } else {

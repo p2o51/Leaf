@@ -16,6 +16,9 @@ class FakeNotion : Dispatcher() {
     val log = CopyOnWriteArrayList<String>()
     private var next = 1
 
+    /** Runs while an append is in flight, before Notion answers: for edits that race a push. */
+    var duringAppend: () -> Unit = {}
+
     fun paragraph(id: String, text: String, color: String = "default", created: String = "2026-10-20T01:00:00.000Z") = Block(id, JSONObject()
         .put("object", "block").put("id", id).put("type", "paragraph").put("created_time", created)
         .put("paragraph", JSONObject().put("color", color).put("rich_text", JSONArray().put(JSONObject().put("plain_text", text)))))
@@ -41,6 +44,7 @@ class FakeNotion : Dispatcher() {
             request.method == "GET" && parts[0] == "blocks" && parts.getOrNull(2) == "children" ->
                 ok(JSONObject().put("results", JSONArray(children[parts[1]].orEmpty().map { it.json })).put("has_more", false))
             request.method == "PATCH" && parts[0] == "blocks" && parts.getOrNull(2) == "children" -> {
+                duringAppend()
                 val list = children.getOrPut(parts[1]) { mutableListOf() }
                 val created = (0 until body!!.getJSONArray("children").length()).map { i ->
                     val json = body.getJSONArray("children").getJSONObject(i)

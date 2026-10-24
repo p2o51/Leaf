@@ -99,7 +99,7 @@ class RoomLeafRepository(
             queue(OutboxOp.SaveEssay, essay.id)
         }
         val old = dao.blocksOf(essay.id).associateBy { it.id }
-        val rows = essay.blocks.mapIndexed { i, b -> b.storedPhoto().toEntity(essay.id, i, old[b.id]?.blockId) }
+        val rows = essay.blocks.mapIndexed { i, b -> b.storedPhoto(old[b.id]).toEntity(essay.id, i, old[b.id]?.blockId) }
         val changed = rows.filter { row -> old[row.id]?.let { it.text != row.text || it.color != row.color || it.type != row.type } ?: true }
         if (changed.isNotEmpty()) {
             dao.upsertBlocks(rows)
@@ -136,13 +136,18 @@ class RoomLeafRepository(
 
     override suspend fun loadEssayBody(essayId: String) = loadBody(essayId)
 
-    /** A photo picked into an essay arrives as a content URI; keep a copy, like a scribble's. */
-    private suspend fun EssayBlock.storedPhoto(): EssayBlock {
+    /**
+     * A photo picked into an essay arrives as a content URI; keep a copy, like a scribble's. The editor
+     * may keep sending the content URI until it adopts the stored row, so a block already stored reuses
+     * its copy instead of importing the photo again on every keystroke.
+     */
+    private suspend fun EssayBlock.storedPhoto(stored: EssayBlockEntity?): EssayBlock {
         val block = this as? EssayBlock.Photo ?: return this
         val local = block.picture as? Picture.Local ?: return this
         if (!local.uri.startsWith("content:")) return this
-        val stored = withContext(Dispatchers.IO) { importPhoto(local.uri) } ?: return this
-        return block.copy(picture = Picture.Local(stored))
+        stored?.photo?.takeIf { it.startsWith("file:") }?.let { return block.copy(picture = Picture.Local(it)) }
+        val copy = withContext(Dispatchers.IO) { importPhoto(local.uri) } ?: return this
+        return block.copy(picture = Picture.Local(copy))
     }
 
     private suspend fun queue(op: String, target: String) {

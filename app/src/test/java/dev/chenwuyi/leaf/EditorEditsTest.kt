@@ -40,6 +40,14 @@ class EditorEditsTest {
     }
 
     @Test
+    fun should_make_a_block_of_each_pasted_line_when_text_has_several_line_breaks() {
+        val e = essay(EssayBlock.Paragraph("a", ""))
+        val (out, focus) = EditorEdits.typed(e, "a", "one\ntwo\n\nthree", newId)
+        assertEquals(listOf("one", "two", "", "three"), out.blocks.map { (it as EssayBlock.Paragraph).text })
+        assertEquals("n3", focus)
+    }
+
+    @Test
     fun should_continue_a_list_and_end_it_on_an_empty_item() {
         val e = essay(EssayBlock.Paragraph("a", "牛奶", "bulleted_list_item"))
         val (cont, _) = EditorEdits.typed(e, "a", "牛奶\n", newId)

@@ -29,20 +29,20 @@ object EditorEdits {
 
     /**
      * New text for a text block. An Enter typed into it splits the block there, like Craft and Notion:
-     * the result's second value is the new block to focus, or null when no split happened. Enter on an
-     * empty list item ends the list instead, turning it into a paragraph.
+     * the result's second value is the new block to focus, or null when no split happened. Pasted lines
+     * each become a block of their own. Enter on an empty list item ends the list instead, turning it
+     * into a paragraph.
      */
     fun typed(essay: Essay, blockId: String, text: String, newId: () -> String): Pair<Essay, String?> {
         val block = essay.blocks.firstOrNull { it.id == blockId } as? EssayBlock.Paragraph ?: return essay to null
-        val enter = text.indexOf('\n')
-        if (enter < 0) return essay.replace(block.copy(text = text)) to null
-        val head = text.substring(0, enter)
-        val tail = text.substring(enter + 1).replace("\n", "")
-        if (head.isEmpty() && tail.isEmpty() && block.type in Continuing) {
+        val lines = text.split('\n')
+        if (lines.size == 1) return essay.replace(block.copy(text = text)) to null
+        if (lines.all { it.isEmpty() } && lines.size == 2 && block.type in Continuing) {
             return essay.replace(block.copy(text = "", type = "paragraph")) to null
         }
-        val next = EssayBlock.Paragraph(newId(), tail, if (block.type in Continuing) block.type else "paragraph")
-        return insertAfter(essay.replace(block.copy(text = head)), block.id, listOf(next)) to next.id
+        val type = if (block.type in Continuing) block.type else "paragraph"
+        val next = lines.drop(1).map { EssayBlock.Paragraph(newId(), it, type) }
+        return insertAfter(essay.replace(block.copy(text = lines.first())), block.id, next) to next.last().id
     }
 
     /** A block for a picked 插入 kind; [Photo] and [Scribble] are built from what was picked instead. */

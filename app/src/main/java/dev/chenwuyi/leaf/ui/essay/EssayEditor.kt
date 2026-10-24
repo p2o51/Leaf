@@ -79,6 +79,7 @@ import dev.chenwuyi.leaf.ui.theme.EditorBodyStyle
 import dev.chenwuyi.leaf.ui.theme.EditorTitleStyle
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
+import kotlinx.coroutines.delay
 import java.time.ZoneId
 import java.util.UUID
 
@@ -100,9 +101,12 @@ fun EssayEditor(
     // Typing goes to a local draft first: waiting for Room's round trip would drop fast keystrokes.
     var draft by remember(essay.id) { mutableStateOf(essay) }
     var lastEdit by remember(essay.id) { mutableLongStateOf(0L) }
-    LaunchedEffect(essay) {
-        // Changes from elsewhere (a body loaded from Notion, a photo copied in) are taken once typing pauses.
-        if (!EditorEdits.sameContent(essay, draft) && System.currentTimeMillis() - lastEdit > AdoptAfterMillis) draft = essay
+    LaunchedEffect(essay, lastEdit) {
+        // Changes from elsewhere (a body loaded from Notion, a photo copied in) are taken once typing
+        // pauses; each keystroke restarts the wait, so an update that arrived mid-typing is not lost.
+        val wait = AdoptAfterMillis - (System.currentTimeMillis() - lastEdit)
+        if (wait > 0) delay(wait)
+        if (!EditorEdits.sameContent(essay, draft)) draft = essay
     }
     val edit: (Essay) -> Unit = { next ->
         draft = next
