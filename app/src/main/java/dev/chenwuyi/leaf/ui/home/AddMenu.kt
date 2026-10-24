@@ -54,11 +54,13 @@ import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.ui.capture.holdToTalk
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 
-enum class AddKind(val label: String, val hint: String, val icon: ImageVector) {
-    Photo("拍照", "记成涂鸦", Icons.Rounded.PhotoCamera),
-    Voice("语音", "记成涂鸦", Icons.Rounded.Mic),
-    Text("文本", "记成涂鸦", Icons.AutoMirrored.Rounded.ShortText),
-    Essay("随笔", "完整的一篇", Icons.Rounded.Edit),
+// No hint under the labels: menus carry no explanations (51's Do/Don't, 2026-10-24). The colour already
+// tells the scribbles (primary) from the essay (tertiary).
+enum class AddKind(val label: String, val icon: ImageVector) {
+    Photo("拍照", Icons.Rounded.PhotoCamera),
+    Voice("语音", Icons.Rounded.Mic),
+    Text("文本", Icons.AutoMirrored.Rounded.ShortText),
+    Essay("随笔", Icons.Rounded.Edit),
 }
 
 /**
@@ -156,6 +158,5 @@ private fun MenuItem(kind: AddKind, onClick: () -> Unit) {
     ) {
         Icon(kind.icon, contentDescription = null, tint = fg)
         Text(kind.label, style = MaterialTheme.typography.titleMedium, color = fg)
-        Text(kind.hint, style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.7f))
     }
 }

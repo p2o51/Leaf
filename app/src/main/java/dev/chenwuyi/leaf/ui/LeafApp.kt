@@ -6,12 +6,15 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -46,14 +49,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chenwuyi.leaf.data.PaneLayout
 import dev.chenwuyi.leaf.data.Picture
-import dev.chenwuyi.leaf.data.WallRules
 import dev.chenwuyi.leaf.data.paneLayout
 import dev.chenwuyi.leaf.ui.capture.Capture
 import dev.chenwuyi.leaf.ui.capture.CaptureSheet
 import dev.chenwuyi.leaf.ui.capture.VoiceSession
 import dev.chenwuyi.leaf.ui.capture.canRecord
 import dev.chenwuyi.leaf.data.voice.VoiceRecognizers
+import dev.chenwuyi.leaf.ui.component.BackPreview
 import dev.chenwuyi.leaf.ui.component.LocalSharedTransitionScope
+import dev.chenwuyi.leaf.ui.component.PagePredictiveBack
+import dev.chenwuyi.leaf.ui.component.backPose
+import dev.chenwuyi.leaf.ui.component.rememberBackPreview
 import dev.chenwuyi.leaf.ui.component.LocalWallVisibilityScope
 import dev.chenwuyi.leaf.ui.essay.EssayEditor
 import dev.chenwuyi.leaf.ui.home.AddKind
@@ -65,6 +71,7 @@ import dev.chenwuyi.leaf.ui.settings.SettingsViewModel
 import dev.chenwuyi.leaf.ui.settings.syncLine
 import dev.chenwuyi.leaf.ui.wall.WallActions
 import dev.chenwuyi.leaf.ui.wall.WallScreen
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -72,7 +79,6 @@ import kotlinx.coroutines.launch
 fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
     val allScribbles by vm.scribbles.collectAsStateWithLifecycle()
     val allEssays by vm.essays.collectAsStateWithLifecycle()
-    val query by vm.query.collectAsStateWithLifecycle()
     val openId by vm.openEssayId.collectAsStateWithLifecycle()
     val wall by vm.wall.collectAsStateWithLifecycle()
     val connection by settings.connection.collectAsStateWithLifecycle()
@@ -107,14 +113,18 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
         }
     }
 
-    BackHandler(settingsOpen) { settingsOpen = false }
-    BackHandler(capture != null) { capture = null }
+    // The page that is drawn on top gets back first, so the handlers go from the bottom page up: the one
+    // composed last wins. Pages follow the finger (predictive back); the menu and the sheet just close.
+    val essayBack = rememberBackPreview()
+    val wallBack = rememberBackPreview()
+    val settingsBack = rememberBackPreview()
+    PagePredictiveBack(wall == null && openId != null, essayBack) { vm.closeEssay() }
+    PagePredictiveBack(wall != null && wall?.selecting != true && capture == null, wallBack) { vm.closeWall() }
+    BackHandler(wall?.selecting == true && capture == null) { vm.stopSelecting() }
     BackHandler(menuOpen) { menuOpen = false }
-    BackHandler(wall != null && capture == null) { if (wall?.selecting == true) vm.stopSelecting() else vm.closeWall() }
-    BackHandler(wall == null && openId != null) { vm.closeEssay() }
+    BackHandler(capture != null) { capture = null }
+    PagePredictiveBack(settingsOpen, settingsBack) { settingsOpen = false }
 
-    val scribbles = WallRules.search(allScribbles, query)
-    val essays = WallRules.searchEssays(allEssays, query)
     val openEssay = allEssays.firstOrNull { it.id == openId }
     // Keep the wall's last state while it animates away, so the chips have somewhere to fly from.
     var lastWall by remember { mutableStateOf(WallState()) }
@@ -142,17 +152,27 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
             CompositionLocalProvider(LocalSharedTransitionScope provides this) {
                 AnimatedContent(
                     targetState = wall != null,
-                    transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(220)) },
+                    // Home never fades: it stays put under the wall, whose surface grows out of the strip
+                    // (the shared "wall-surface" bounds) and shrinks back into it. A crossfade of the two
+                    // pages showed both at once halfway through.
+                    transitionSpec = {
+                        if (targetState) {
+                            ContentTransform(fadeIn(LeafMotion.tool()), ExitTransition.KeepUntilTransitionsFinished, targetContentZIndex = 1f)
+                        } else {
+                            ContentTransform(EnterTransition.None, fadeOut(LeafMotion.tool()), targetContentZIndex = -1f)
+                        }
+                    },
                     label = "wall",
                 ) { wallOpen ->
                     CompositionLocalProvider(LocalWallVisibilityScope provides this) {
                         if (wallOpen) {
-                            WallScreen(lastWall, allScribbles, allEssays, wallActions)
+                            LaunchedEffect(Unit) { wallBack.reset() }
+                            WallScreen(lastWall, allScribbles, allEssays, wallActions, Modifier.backPose(wallBack))
                         } else {
                             Panes(
                                 listContent = { m ->
                                     Box(m) {
-                                        HomePane(scribbles, essays, query, openId, vm::setQuery, vm::openWall, vm::openEssay, { settingsOpen = true }, Modifier.fillMaxSize())
+                                        HomePane(allScribbles, allEssays, openId, vm::openWall, vm::openEssay, { settingsOpen = true }, Modifier.fillMaxSize())
                                         AddMenu(
                                             menuOpen,
                                             { menuOpen = it },
@@ -166,6 +186,8 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                         )
                                     }
                                 },
+                                editorKey = openEssay?.id,
+                                back = essayBack,
                                 editor = openEssay?.let { e ->
                                     { m -> EssayEditor(e, allScribbles, syncLine(connection, syncStatus), vm::closeEssay, vm::updateEssay, m) }
                                 },
@@ -181,30 +203,67 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
             onDismiss = { capture = null },
             onSave = { text, color, photo ->
                 capture = null
-                vm.addScribble(text, color, photo) { s -> notify("记下了") { vm.delete(setOf(s.id)) } }
+                vm.addScribble(text, color, photo) { s ->
+                    // The sheet says 记下了 itself; the undo waits until it has slid away.
+                    scope.launch {
+                        delay(LeafMotion.SheetFinishMillis)
+                        notify("新涂鸦") { vm.delete(setOf(s.id)) }
+                    }
+                }
             },
         )
         AnimatedVisibility(settingsOpen, enter = slideInHorizontally(LeafMotion.expressive()) { it }, exit = slideOutHorizontally(LeafMotion.tool()) { it }) {
-            SettingsScreen(settings, onClose = { settingsOpen = false })
+            LaunchedEffect(Unit) { settingsBack.reset() }
+            SettingsScreen(settings, onClose = { settingsOpen = false }, Modifier.backPose(settingsBack))
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 100.dp))
     }
 }
 
 /**
- * Wide screens start as one full-width list; opening an essay slides the list to 410 dp and puts the
- * editor beside it. Narrow screens swap between the list and the editor.
+ * Wide screens start as one full-width list; opening an essay slides the list to 410 dp and the editor
+ * comes in beside it, and switching essays there changes the editor in place rather than swapping it at
+ * once. Narrow screens swap between the list and the editor. [back] is the editor's back preview.
  */
 @Composable
-private fun Panes(listContent: @Composable (Modifier) -> Unit, editor: (@Composable (Modifier) -> Unit)?) {
+private fun Panes(
+    listContent: @Composable (Modifier) -> Unit,
+    editorKey: String?,
+    back: BackPreview,
+    editor: (@Composable (Modifier) -> Unit)?,
+) {
+    // Keep the last editor while it animates away, so the pane has something to slide out.
+    var shown by remember { mutableStateOf(editor) }
+    var shownKey by remember { mutableStateOf(editorKey) }
+    if (editor != null) {
+        shown = editor
+        shownKey = editorKey
+    }
+    LaunchedEffect(editor != null) { if (editor != null) back.reset() }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = paneLayout(maxWidth.value.toInt(), essayOpen = true) == PaneLayout.Split
         if (wide) {
             val listWidth by animateDpAsState(if (editor != null) 410.dp else maxWidth, LeafMotion.expressive(), label = "list")
             Row(Modifier.fillMaxSize()) {
                 listContent(Modifier.width(listWidth).fillMaxHeight())
-                if (editor != null) {
-                    editor(Modifier.weight(1f).fillMaxHeight().padding(10.dp).clip(RoundedCornerShape(32.dp)))
+                AnimatedVisibility(
+                    editor != null,
+                    Modifier.weight(1f).fillMaxHeight(),
+                    enter = slideInHorizontally(LeafMotion.expressive()) { it / 3 } + fadeIn(LeafMotion.tool()),
+                    exit = slideOutHorizontally(LeafMotion.tool()) { it / 3 } + fadeOut(LeafMotion.tool()),
+                    label = "editor pane",
+                ) {
+                    AnimatedContent(
+                        targetState = shownKey,
+                        // Another essay: the old page leaves at once and the new one settles in, so two
+                        // editors are never on screen together.
+                        transitionSpec = { (fadeIn(LeafMotion.tool()) + scaleIn(LeafMotion.expressive(), initialScale = 0.96f)) togetherWith ExitTransition.None },
+                        label = "editor switch",
+                    ) { key ->
+                        if (key == shownKey) {
+                            shown?.invoke(Modifier.fillMaxSize().padding(10.dp).backPose(back).clip(RoundedCornerShape(32.dp)))
+                        }
+                    }
                 }
             }
         } else {
@@ -217,7 +276,7 @@ private fun Panes(listContent: @Composable (Modifier) -> Unit, editor: (@Composa
                 contentKey = { it != null },
                 label = "editor",
             ) { e ->
-                if (e == null) listContent(Modifier.fillMaxSize()) else e(Modifier.fillMaxSize())
+                if (e == null) listContent(Modifier.fillMaxSize()) else e(Modifier.fillMaxSize().backPose(back))
             }
         }
     }
