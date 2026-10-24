@@ -161,4 +161,32 @@ class SyncEngineTest {
         assertEquals("k1", blocks.first().id)
         assertTrue(db.dao().essay("e1")!!.bodyLoaded)
     }
+
+    @Test
+    fun should_create_typed_blocks_and_upload_photos_when_inserted_in_the_editor() = runBlocking {
+        val withPhotos = SyncEngine(db.dao(), LeafNotion(NotionClient(baseUrl = "http://127.0.0.1:${server.port}/v1/".toHttpUrl(), requestIntervalMillis = 0)), store,
+            readPhoto = { byteArrayOf(1, 2, 3) })
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default")))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上"))
+        val essay = repo.essays.first().single()
+        repo.updateEssay(essay.copy(blocks = essay.blocks + EssayBlock.Paragraph("h", "路口", "heading_2") + EssayBlock.Photo("i", dev.chenwuyi.leaf.data.Picture.Local("file:///photo.jpg"), "晚霞")))
+        withPhotos.run(pull = false)
+
+        val sent = fake.children.getValue("p1").map { it.json.getString("type") }
+        assertEquals(listOf("paragraph", "heading_2", "image"), sent)
+        assertEquals("file_upload", fake.children.getValue("p1")[2].json.getJSONObject("image").getString("type"))
+        assertTrue(db.dao().blocksOf("e1").all { it.blockId != null })
+    }
+
+    @Test
+    fun should_delete_the_notion_block_when_a_block_is_removed_in_the_editor() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default"), EssayBlockEntity("k2", "e1", 1, "x2", "paragraph", "", "default")))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上"), fake.paragraph("x2", ""))
+        repo.removeBlocks("e1", setOf("k2"))
+        engine.run(pull = false)
+        assertEquals(listOf("x1"), fake.children.getValue("p1").map { it.id })
+        assertEquals(listOf("k1"), db.dao().blocksOf("e1").map { it.id })
+    }
 }

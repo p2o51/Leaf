@@ -167,7 +167,7 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                     }
                                 },
                                 editor = openEssay?.let { e ->
-                                    { m -> EssayEditor(e, allScribbles, syncLine(connection, syncStatus), vm::closeEssay, vm::updateEssay, m) }
+                                    { m -> EssayEditor(e, allScribbles, syncLine(connection, syncStatus), vm::closeEssay, vm::updateEssay, { id -> vm.removeBlock(e.id, id) }, m) }
                                 },
                             )
                         }

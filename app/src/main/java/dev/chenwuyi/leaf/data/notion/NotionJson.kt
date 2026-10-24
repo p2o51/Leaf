@@ -26,7 +26,7 @@ data class RemoteRow(
 )
 
 /** An essay body block. [type] is Notion's block type; only text-bearing types are editable in Leaf. */
-data class RemoteBlock(val blockId: String, val type: String, val text: String, val color: NotionColor) {
+data class RemoteBlock(val blockId: String, val type: String, val text: String, val color: NotionColor, val imageUrl: String? = null) {
     val editable: Boolean get() = type in NotionJson.TEXT_TYPES
 }
 
@@ -121,7 +121,8 @@ object NotionJson {
             "image" -> plain(value.optJSONArray("caption"))
             else -> ""
         }
-        return RemoteBlock(block.getString("id"), type, text, NotionColor.fromApi(value.optString("color")))
+        val image = if (type == "image") fileUrl(value) else null
+        return RemoteBlock(block.getString("id"), type, text, NotionColor.fromApi(value.optString("color")), image)
     }
 
     fun plain(array: JSONArray?): String {
@@ -147,9 +148,14 @@ object NotionJson {
         return out
     }
 
-    fun paragraph(text: String, color: NotionColor): JSONObject =
-        JSONObject().put("object", "block").put("type", "paragraph")
-            .put("paragraph", JSONObject().put("rich_text", richText(text)).put("color", color.backgroundApiName))
+    fun paragraph(text: String, color: NotionColor): JSONObject = textBlock("paragraph", text, color)
+
+    /** Any of [TEXT_TYPES] as a new block; a to-do starts unchecked. */
+    fun textBlock(type: String, text: String, color: NotionColor): JSONObject {
+        val value = JSONObject().put("rich_text", richText(text)).put("color", color.backgroundApiName)
+        if (type == "to_do") value.put("checked", false)
+        return JSONObject().put("object", "block").put("type", type).put(type, value)
+    }
 
     fun image(uploadId: String, caption: String): JSONObject =
         JSONObject().put("object", "block").put("type", "image").put("image", JSONObject()
