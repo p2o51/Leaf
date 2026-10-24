@@ -12,7 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  # write only so a pull request's screenshots can be pushed to its screenshots/pr-N branch (below).
+  contents: write
 
 jobs:
   android:
@@ -64,3 +65,22 @@ jobs:
           name: leaf-screenshots
           path: app/build/screenshots/*.png
           if-no-files-found: warn
+      # The same pictures on a branch of their own, screenshots/pr-N, so they can be looked at on
+      # GitHub and fetched with git; nothing else is ever pushed from here.
+      - name: publish screenshots
+        if: always() && github.event_name == 'pull_request'
+        env:
+          TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -e
+          ls app/build/screenshots/*.png >/dev/null 2>&1 || exit 0
+          dir=$(mktemp -d)
+          cp app/build/screenshots/*.png "$dir"
+          cd "$dir"
+          git init -q -b shots
+          git add .
+          git -c user.name=leaf-ci -c user.email=leaf-ci@users.noreply.github.com commit -qm "screenshots of $SHA"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${REPO}.git" "shots:refs/heads/screenshots/pr-${PR}"
