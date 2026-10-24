@@ -123,6 +123,7 @@ fun EssayEditor(
     onChange: (Essay) -> Unit,
     onRemoveBlock: (String) -> Unit,
     modifier: Modifier = Modifier,
+    start: EditorStart = EditorStart(),
 ) {
     // Typing goes to a local draft first: waiting for Room's round trip would drop fast keystrokes.
     var draft by remember(essay.id) { mutableStateOf(essay) }
@@ -140,11 +141,11 @@ fun EssayEditor(
         onChange(next)
     }
 
-    var focused by remember(essay.id) { mutableStateOf<String?>(null) }
+    var focused by remember(essay.id) { mutableStateOf(start.focus) }
     var focusNext by remember(essay.id) { mutableStateOf<String?>(null) }
     val requesters = remember(essay.id) { mutableStateMapOf<String, FocusRequester>() }
-    var panel by remember { mutableStateOf(ToolPanel.None) }
-    var tab by remember { mutableStateOf(SideTab.Insert) }
+    var panel by remember { mutableStateOf(start.panel) }
+    var tab by remember { mutableStateOf(if (start.styleTab) SideTab.Style else SideTab.Insert) }
     var picking by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
     val keyboardUp = WindowInsets.isImeVisible
@@ -345,6 +346,9 @@ fun EssayEditor(
         )
     }
 }
+
+/** Where the editor's tools start. Always closed in the app; the screenshot tests open a panel straight away. */
+data class EditorStart(val panel: ToolPanel = ToolPanel.None, val focus: String? = null, val styleTab: Boolean = false)
 
 private enum class SideTab(val label: String) { Insert("插入"), Style("样式") }
 

@@ -57,3 +57,10 @@ jobs:
         with:
           name: leaf-release-apk-debug-signed
           path: app/build/outputs/apk/release/*.apk
+      # Robolectric pictures of the editor (EditorScreenshots), for looking at UI without a device.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: leaf-screenshots
+          path: app/build/screenshots/*.png
+          if-no-files-found: warn
