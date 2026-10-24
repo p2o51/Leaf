@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -114,14 +116,14 @@ fun EditorToolbar(
 private fun ToolButton(icon: ImageVector, label: String, on: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     val tint = when {
         !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-        on -> MaterialTheme.colorScheme.onSecondaryContainer
+        on -> MaterialTheme.colorScheme.onPrimaryContainer
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Box(
         Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .background(if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label; selected = on },
         contentAlignment = Alignment.Center,
@@ -263,7 +265,7 @@ fun StyleControls(block: EssayBlock.Paragraph?, onType: (String) -> Unit, onColo
                             .weight(1f)
                             .height(44.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(if (on) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .background(if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest)
                             .clickable(role = Role.Checkbox) { onType(if (on) "paragraph" else type) }
                             .semantics { selected = on },
                         horizontalArrangement = Arrangement.Center,
@@ -274,7 +276,8 @@ fun StyleControls(block: EssayBlock.Paragraph?, onType: (String) -> Unit, onColo
                     }
                 }
             }
-            ColorDots(block.color, onColor)
+            // One row that scrolls, rather than nine dots and a lone tenth on the next line.
+            ColorDots(block.color, onColor, Modifier.horizontalScroll(rememberScrollState()))
         }
     }
 }
