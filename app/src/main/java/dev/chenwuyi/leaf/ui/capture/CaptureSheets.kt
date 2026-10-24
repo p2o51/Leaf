@@ -71,14 +71,21 @@ sealed interface Capture {
 fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit) {
     // After 记下 the sheet stays a moment with a tick and 记下了, then slides away (Paw's SheetFinisher),
     // instead of vanishing the instant the scribble is saved. The scribble itself is saved at once.
+    // [finishing] holds the sheet up for the pause; [done] keeps the tick shown through the slide away
+    // too, so the form (which would take focus and bring the keyboard back) never returns as it leaves.
     var finishing by remember { mutableStateOf(false) }
+    var done by remember { mutableStateOf(false) }
     LaunchedEffect(finishing) {
         if (finishing) {
             delay(LeafMotion.SheetFinishMillis)
             finishing = false
         }
     }
-    LaunchedEffect(capture) { if (capture != null) finishing = false }
+    // A new capture opens on the form, also when it comes during the pause.
+    if (capture != null && (done || finishing)) {
+        done = false
+        finishing = false
+    }
     val visible = capture != null || finishing
     Box(Modifier.fillMaxSize()) {
         AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
@@ -94,16 +101,17 @@ fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, 
             var shown by remember { mutableStateOf<Capture>(Capture.Text) }
             if (capture != null) shown = capture
             AnimatedContent(
-                targetState = finishing,
+                targetState = done,
                 // The form goes at once and the tick settles in as the sheet shrinks to it, so the two never overlap.
                 transitionSpec = { fadeIn(LeafMotion.tool()) togetherWith ExitTransition.None using SizeTransform { _, _ -> LeafMotion.expressive() } },
                 label = "sheet finish",
-            ) { done ->
-                if (done) {
+            ) { finished ->
+                if (finished) {
                     SheetDone()
                 } else {
                     SheetBody(shown, voice) { text, color, photo ->
                         finishing = true
+                        done = true
                         onSave(text, color, photo)
                     }
                 }
