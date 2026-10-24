@@ -26,6 +26,8 @@ interface LeafRepository {
     suspend fun copyToEssay(scribbleIds: Set<String>, essayId: String?): String
     /** Fetches an essay's body from Notion when it is not loaded yet (no-op when offline or unconnected). */
     suspend fun loadEssayBody(essayId: String) {}
+
+    suspend fun removeBlocks(essayId: String, blockIds: Set<String>)
 }
 
 class InMemoryLeafRepository(
@@ -67,6 +69,10 @@ class InMemoryLeafRepository(
 
     override suspend fun updateEssay(essay: Essay) {
         essayState.update { list -> list.map { if (it.id == essay.id) essay.copy(editedAt = clock()) else it } }
+    }
+
+    override suspend fun removeBlocks(essayId: String, blockIds: Set<String>) {
+        essayState.update { list -> list.map { e -> if (e.id == essayId) e.copy(blocks = e.blocks.filter { it.id !in blockIds }) else e } }
     }
 
     override suspend fun copyToEssay(scribbleIds: Set<String>, essayId: String?): String {

@@ -105,4 +105,8 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
     fun updateEssay(essay: Essay) {
         viewModelScope.launch { repository.updateEssay(essay) }
     }
+
+    fun removeBlock(essayId: String, blockId: String) {
+        viewModelScope.launch { repository.removeBlocks(essayId, setOf(blockId)) }
+    }
 }

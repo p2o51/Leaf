@@ -10,9 +10,13 @@ import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.WallRules
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Room-backed repository. Every write is local first; when Notion is connected it also queues an
@@ -84,21 +88,45 @@ class RoomLeafRepository(
         return e
     }
 
-    override suspend fun updateEssay(essay: Essay) {
-        val stored = dao.essay(essay.id) ?: return
+    // Editor writes are launched per keystroke; one at a time keeps a removal from being written back.
+    private val essayWrites = Mutex()
+
+    override suspend fun updateEssay(essay: Essay): Unit = essayWrites.withLock {
+        val stored = dao.essay(essay.id) ?: return@withLock
         val now = clock().toEpochMilli()
         if (stored.title != essay.title || stored.color != essay.color.apiName || stored.pinned != essay.pinned) {
             dao.upsertEssays(listOf(stored.copy(title = essay.title, color = essay.color.apiName, pinned = essay.pinned, editedAt = now)))
             queue(OutboxOp.SaveEssay, essay.id)
         }
         val old = dao.blocksOf(essay.id).associateBy { it.id }
-        val rows = essay.blocks.mapIndexed { i, b -> b.toEntity(essay.id, i, old[b.id]?.blockId) }
-        val changed = rows.filter { row -> old[row.id]?.let { it.text != row.text || it.color != row.color } ?: true }
+        val rows = essay.blocks.mapIndexed { i, b ->
+            val before = old[b.id]
+            val row = b.storedPhoto(before).toEntity(essay.id, i, before?.blockId)
+            // Notion cannot change a block's type in place: a restyled block goes out as a new block
+            // in the same spot, and the old one is deleted.
+            if (before?.blockId != null && before.type != row.type) row.copy(blockId = null) else row
+        }
+        val changed = rows.filter { row -> old[row.id]?.let { it.text != row.text || it.color != row.color || it.type != row.type } ?: true }
         if (changed.isNotEmpty()) {
             dao.upsertBlocks(rows)
             dao.upsertEssays(listOf((dao.essay(essay.id) ?: stored).copy(editedAt = now)))
-            changed.forEach { queue(OutboxOp.SaveBlock, it.id) }
+            changed.forEach { row ->
+                old[row.id]?.takeIf { it.type != row.type }?.blockId?.let { queue(OutboxOp.DeleteBlock, it) }
+                queue(OutboxOp.SaveBlock, row.id)
+            }
         }
+    }
+
+    /**
+     * Removal is its own call rather than read off a missing block in [updateEssay]: an editor still
+     * holding an older list (a body just loaded from Notion) must never delete what it has not seen.
+     */
+    override suspend fun removeBlocks(essayId: String, blockIds: Set<String>): Unit = essayWrites.withLock {
+        val gone = dao.blocksOf(essayId).filter { it.id in blockIds }
+        if (gone.isEmpty()) return@withLock
+        dao.deleteBlocks(gone.map { it.id })
+        dao.essay(essayId)?.let { dao.upsertEssays(listOf(it.copy(editedAt = clock().toEpochMilli()))) }
+        gone.forEach { row -> row.blockId?.let { queue(OutboxOp.DeleteBlock, it) } }
     }
 
     override suspend fun copyToEssay(scribbleIds: Set<String>, essayId: String?): String {
@@ -117,9 +145,23 @@ class RoomLeafRepository(
 
     override suspend fun loadEssayBody(essayId: String) = loadBody(essayId)
 
+    /**
+     * A photo picked into an essay arrives as a content URI; keep a copy, like a scribble's. The editor
+     * may keep sending the content URI until it adopts the stored row, so a block already stored reuses
+     * its copy instead of importing the photo again on every keystroke.
+     */
+    private suspend fun EssayBlock.storedPhoto(stored: EssayBlockEntity?): EssayBlock {
+        val block = this as? EssayBlock.Photo ?: return this
+        val local = block.picture as? Picture.Local ?: return this
+        if (!local.uri.startsWith("content:")) return this
+        stored?.photo?.takeIf { it.startsWith("file:") }?.let { return block.copy(picture = Picture.Local(it)) }
+        val copy = withContext(Dispatchers.IO) { importPhoto(local.uri) } ?: return this
+        return block.copy(picture = Picture.Local(copy))
+    }
+
     private suspend fun queue(op: String, target: String) {
         if (!isConnected()) return
-        if (op != OutboxOp.DeleteScribble && dao.pendingOps().any { it.op == op && it.targetId == target }) return
+        if (op != OutboxOp.DeleteScribble && op != OutboxOp.DeleteBlock && dao.pendingOps().any { it.op == op && it.targetId == target }) return
         dao.enqueue(OutboxEntity(op = op, targetId = target))
         requestSync()
     }

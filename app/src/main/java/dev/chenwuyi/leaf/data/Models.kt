@@ -63,6 +63,9 @@ sealed interface EssayBlock {
 
     /** A copy of a scribble's synced block: it always renders from the live scribble. */
     data class SyncedScribble(override val id: String, val scribbleId: String) : EssayBlock
+
+    /** An image block; [caption] is Notion's image caption. */
+    data class Photo(override val id: String, val picture: Picture, val caption: String = "") : EssayBlock
 }
 
 /** Every database row other than the wall. The title is the page title; blocks are the page body. */

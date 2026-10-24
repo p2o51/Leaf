@@ -161,4 +161,71 @@ class SyncEngineTest {
         assertEquals("k1", blocks.first().id)
         assertTrue(db.dao().essay("e1")!!.bodyLoaded)
     }
+
+    @Test
+    fun should_create_typed_blocks_and_upload_photos_when_inserted_in_the_editor() = runBlocking {
+        val withPhotos = SyncEngine(db.dao(), LeafNotion(NotionClient(baseUrl = "http://127.0.0.1:${server.port}/v1/".toHttpUrl(), requestIntervalMillis = 0)), store,
+            readPhoto = { byteArrayOf(1, 2, 3) })
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default")))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上"))
+        val essay = repo.essays.first().single()
+        repo.updateEssay(essay.copy(blocks = essay.blocks + EssayBlock.Paragraph("h", "路口", "heading_2") + EssayBlock.Photo("i", dev.chenwuyi.leaf.data.Picture.Local("file:///photo.jpg"), "晚霞")))
+        withPhotos.run(pull = false)
+
+        val sent = fake.children.getValue("p1").map { it.json.getString("type") }
+        assertEquals(listOf("paragraph", "heading_2", "image"), sent)
+        assertEquals("file_upload", fake.children.getValue("p1")[2].json.getJSONObject("image").getString("type"))
+        assertTrue(db.dao().blocksOf("e1").all { it.blockId != null })
+    }
+
+    @Test
+    fun should_delete_the_notion_block_when_a_block_is_removed_in_the_editor() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default"), EssayBlockEntity("k2", "e1", 1, "x2", "paragraph", "", "default")))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上"), fake.paragraph("x2", ""))
+        repo.removeBlocks("e1", setOf("k2"))
+        engine.run(pull = false)
+        assertEquals(listOf("x1"), fake.children.getValue("p1").map { it.id })
+        assertEquals(listOf("k1"), db.dao().blocksOf("e1").map { it.id })
+    }
+
+    @Test
+    fun should_delete_the_new_notion_block_when_it_is_removed_while_being_created() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        fake.children["p1"] = mutableListOf()
+        val essay = repo.essays.first().single()
+        repo.updateEssay(essay.copy(blocks = essay.blocks + EssayBlock.Paragraph("k1", "写错了")))
+        fake.duringAppend = { runBlocking { repo.removeBlocks("e1", setOf("k1")) } }
+        engine.run(pull = false)
+        assertEquals(emptyList<String>(), fake.children.getValue("p1").map { it.id })
+        assertEquals(emptyList<String>(), db.dao().blocksOf("e1").map { it.id })
+    }
+
+    @Test
+    fun should_import_a_picked_photo_once_when_the_editor_keeps_sending_its_content_uri() = runBlocking {
+        var imports = 0
+        val photos = RoomLeafRepository(db.dao(), isConnected = { true }, requestSync = {}, importPhoto = { imports++; "file:///copy-$imports.jpg" })
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        val essay = photos.essays.first().single()
+        val picked = EssayBlock.Photo("i", dev.chenwuyi.leaf.data.Picture.Local("content://media/1"))
+        photos.updateEssay(essay.copy(blocks = listOf(picked)))
+        photos.updateEssay(essay.copy(title = "东京", blocks = listOf(picked)))
+        assertEquals(1, imports)
+        assertEquals("file:///copy-1.jpg", db.dao().blocksOf("e1").single().photo)
+    }
+
+    @Test
+    fun should_replace_the_notion_block_when_a_block_is_restyled() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default"), EssayBlockEntity("k2", "e1", 1, "x2", "paragraph", "路口", "default")))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上"), fake.paragraph("x2", "路口"))
+        val essay = repo.essays.first().single()
+        repo.updateEssay(essay.copy(blocks = essay.blocks.map { if (it.id == "k1") (it as EssayBlock.Paragraph).copy(type = "heading_2") else it }))
+        engine.run(pull = false)
+        val sent = fake.children.getValue("p1")
+        assertEquals(listOf("heading_2", "paragraph"), sent.map { it.json.getString("type") })
+        assertEquals("x2", sent[1].id)
+        assertEquals(sent[0].id, db.dao().blocksOf("e1").first { it.id == "k1" }.blockId)
+    }
 }
