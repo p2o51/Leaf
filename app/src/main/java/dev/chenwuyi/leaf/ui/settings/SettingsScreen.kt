@@ -103,10 +103,21 @@ private fun Modifier.column(bleed: Dp = 0.dp): Modifier =
 @Composable
 private fun NotionGroup(vm: SettingsViewModel, connection: Connection?, status: SyncStatus, step: ConnectStep) {
     if (connection != null) {
+        // Sync problems carry instructions (share the database with the integration…), so the row only
+        // flags them and the full message goes in a hint below, where it can wrap.
+        val problem = (status as? SyncStatus.NeedsAttention)?.message ?: (status as? SyncStatus.Waiting)?.message
+        val value = when (status) {
+            is SyncStatus.NeedsAttention -> "需要处理"
+            is SyncStatus.Waiting -> "稍后重试"
+            else -> syncLine(connection, status)
+        }
         SettingsSection("Notion") {
             SettingsRow(Icons.Rounded.Storage, connection.databaseName, detail = connection.workspace)
-            ActionRow(Icons.Rounded.Sync, "立即同步", value = syncLine(connection, status), onClick = vm::sync)
+            ActionRow(Icons.Rounded.Sync, "立即同步", value = value, onClick = vm::sync)
             ActionRow(Icons.Rounded.LinkOff, "断开连接", titleColor = MaterialTheme.colorScheme.error, onClick = vm::disconnect)
+        }
+        if (problem != null) {
+            SettingsHint(problem, if (status is SyncStatus.NeedsAttention) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
         }
         SettingsHint("断开只清掉这台设备上的副本，Notion 里的内容都在。")
         return
