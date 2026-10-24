@@ -67,8 +67,8 @@ class LeafNotion(private val client: NotionClient = NotionClient()) {
         children(token, pageId).mapNotNull(NotionJson::bodyBlock)
 
     /** Appends blocks and returns the created blocks (id + created_time), in order. */
-    suspend fun append(token: String, parentId: String, blocks: List<JSONObject>, afterBlockId: String? = null): List<Pair<String, Instant>> {
-        val response = client.patch(token, "blocks/$parentId/children", NotionJson.children(blocks, afterBlockId))
+    suspend fun append(token: String, parentId: String, blocks: List<JSONObject>, afterBlockId: String? = null, atStart: Boolean = false): List<Pair<String, Instant>> {
+        val response = client.patch(token, "blocks/$parentId/children", NotionJson.children(blocks, afterBlockId, atStart))
         return response.optJSONArray("results").objects().map { it.getString("id") to Instant.parse(it.getString("created_time")) }
     }
 

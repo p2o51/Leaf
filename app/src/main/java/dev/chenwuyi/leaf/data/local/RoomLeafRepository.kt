@@ -99,12 +99,21 @@ class RoomLeafRepository(
             queue(OutboxOp.SaveEssay, essay.id)
         }
         val old = dao.blocksOf(essay.id).associateBy { it.id }
-        val rows = essay.blocks.mapIndexed { i, b -> b.storedPhoto(old[b.id]).toEntity(essay.id, i, old[b.id]?.blockId) }
+        val rows = essay.blocks.mapIndexed { i, b ->
+            val before = old[b.id]
+            val row = b.storedPhoto(before).toEntity(essay.id, i, before?.blockId)
+            // Notion cannot change a block's type in place: a restyled block goes out as a new block
+            // in the same spot, and the old one is deleted.
+            if (before?.blockId != null && before.type != row.type) row.copy(blockId = null) else row
+        }
         val changed = rows.filter { row -> old[row.id]?.let { it.text != row.text || it.color != row.color || it.type != row.type } ?: true }
         if (changed.isNotEmpty()) {
             dao.upsertBlocks(rows)
             dao.upsertEssays(listOf((dao.essay(essay.id) ?: stored).copy(editedAt = now)))
-            changed.forEach { queue(OutboxOp.SaveBlock, it.id) }
+            changed.forEach { row ->
+                old[row.id]?.takeIf { it.type != row.type }?.blockId?.let { queue(OutboxOp.DeleteBlock, it) }
+                queue(OutboxOp.SaveBlock, row.id)
+            }
         }
     }
 

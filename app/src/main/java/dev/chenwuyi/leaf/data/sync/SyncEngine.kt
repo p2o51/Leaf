@@ -157,7 +157,10 @@ class SyncEngine(
         val color = NotionColor.fromApi(row.color)
         val blockId = row.blockId
         if (blockId == null) {
-            val after = dao.blocksOf(row.essayId).filter { it.position < row.position && it.blockId != null }.maxByOrNull { it.position }?.blockId
+            val siblings = dao.blocksOf(row.essayId).filter { it.blockId != null && it.id != row.id }
+            val after = siblings.filter { it.position < row.position }.maxByOrNull { it.position }?.blockId
+            // Nothing synced before it but something after: it is the new first block (a restyled opening line).
+            val atStart = after == null && siblings.any { it.position > row.position }
             val block = if (isImage) {
                 // Inserted in Leaf, so the photo is a local copy (PhotoStore); without it there is nothing to send.
                 val bytes = row.photo?.takeIf { it.startsWith("file:") }?.let(readPhoto) ?: return
@@ -165,9 +168,10 @@ class SyncEngine(
             } else {
                 NotionJson.textBlock(row.type, row.text, color)
             }
-            val created = notion.append(token, pageId, listOf(block), after).firstOrNull() ?: return
-            // Removed while it was being created: its removal had no Notion ID to delete, so delete it here.
-            val now = dao.block(row.id) ?: return notion.deleteBlock(token, created.first)
+            val created = notion.append(token, pageId, listOf(block), after, atStart).firstOrNull() ?: return
+            // Removed, or restyled into another type, while it was being created: the local row has no
+            // use for this block, so delete it here; a restyled row is sent again as its new type.
+            val now = dao.block(row.id)?.takeIf { it.type == row.type } ?: return notion.deleteBlock(token, created.first)
             dao.upsertBlocks(listOf(now.copy(blockId = created.first)))
         } else if (isImage) {
             notion.updateBlock(token, blockId, NotionJson.captionUpdate(row.text))

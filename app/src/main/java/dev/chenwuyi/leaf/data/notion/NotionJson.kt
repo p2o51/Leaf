@@ -171,11 +171,13 @@ object NotionJson {
 
     fun captionUpdate(caption: String): JSONObject = JSONObject().put("image", JSONObject().put("caption", richText(caption)))
 
-    fun children(blocks: List<JSONObject>, afterBlockId: String? = null): JSONObject {
+    fun children(blocks: List<JSONObject>, afterBlockId: String? = null, atStart: Boolean = false): JSONObject {
         val body = JSONObject().put("children", JSONArray(blocks))
         // 2026-03-11 replaced the top-level "after" with a position object; omitted means the end.
         if (afterBlockId != null) {
             body.put("position", JSONObject().put("type", "after_block").put("after_block", JSONObject().put("id", afterBlockId)))
+        } else if (atStart) {
+            body.put("position", JSONObject().put("type", "start"))
         }
         return body
     }

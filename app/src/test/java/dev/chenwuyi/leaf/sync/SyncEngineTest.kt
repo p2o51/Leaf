@@ -214,4 +214,18 @@ class SyncEngineTest {
         assertEquals(1, imports)
         assertEquals("file:///copy-1.jpg", db.dao().blocksOf("e1").single().photo)
     }
+
+    @Test
+    fun should_replace_the_notion_block_when_a_block_is_restyled() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default"), EssayBlockEntity("k2", "e1", 1, "x2", "paragraph", "路口", "default")))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上"), fake.paragraph("x2", "路口"))
+        val essay = repo.essays.first().single()
+        repo.updateEssay(essay.copy(blocks = essay.blocks.map { if (it.id == "k1") (it as EssayBlock.Paragraph).copy(type = "heading_2") else it }))
+        engine.run(pull = false)
+        val sent = fake.children.getValue("p1")
+        assertEquals(listOf("heading_2", "paragraph"), sent.map { it.json.getString("type") })
+        assertEquals("x2", sent[1].id)
+        assertEquals(sent[0].id, db.dao().blocksOf("e1").first { it.id == "k1" }.blockId)
+    }
 }

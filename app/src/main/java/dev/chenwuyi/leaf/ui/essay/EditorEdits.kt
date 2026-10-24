@@ -2,18 +2,30 @@ package dev.chenwuyi.leaf.ui.essay
 
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.EssayBlock
+import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.Scribble
 
-/** What the editor's 插入 menu can add. [type] is the Notion block type it becomes. */
-enum class InsertKind(val label: String, val type: String) {
-    Paragraph("段落", "paragraph"),
-    Heading("标题", "heading_2"),
-    Bullet("列表", "bulleted_list_item"),
-    Numbered("编号", "numbered_list_item"),
-    Quote("引用", "quote"),
-    Photo("照片", "image"),
-    Scribble("涂鸦", "paragraph"),
+/**
+ * What the editor's 插入 panel can add, in Craft's order: text styles, lists, then media. [type] is the
+ * Notion block type it becomes; [glyph] is the tile's big letter, as Craft draws H1, H2, P.
+ */
+enum class InsertKind(val label: String, val type: String, val glyph: String) {
+    Paragraph("正文", "paragraph", "P"),
+    Title("大标题", "heading_1", "H1"),
+    Heading("标题", "heading_2", "H2"),
+    Subheading("小标题", "heading_3", "H3"),
+    Quote("引用", "quote", "❝"),
+    Bullet("列表", "bulleted_list_item", "•"),
+    Numbered("编号", "numbered_list_item", "1."),
+    Photo("照片", "image", ""),
+    Scribble("涂鸦", "paragraph", ""),
+    ;
+
+    companion object {
+        val TextStyles = listOf(Paragraph, Title, Heading, Subheading, Quote)
+        val Lists = listOf(Bullet, Numbered)
+    }
 }
 
 /** Pure block edits behind the editor, kept apart from Compose so they can be tested. */
@@ -68,6 +80,27 @@ object EditorEdits {
     fun before(essay: Essay, blockId: String): String? {
         val at = essay.blocks.indexOfFirst { it.id == blockId }
         return if (at > 0) essay.blocks[at - 1].id else null
+    }
+
+    /** Turns a text block into another text kind (样式), keeping its words and colour. */
+    fun restyle(essay: Essay, blockId: String, type: String): Essay {
+        val block = essay.blocks.firstOrNull { it.id == blockId } as? EssayBlock.Paragraph ?: return essay
+        return essay.replace(block.copy(type = type))
+    }
+
+    fun recolor(essay: Essay, blockId: String, color: NotionColor): Essay {
+        val block = essay.blocks.firstOrNull { it.id == blockId } as? EssayBlock.Paragraph ?: return essay
+        return essay.replace(block.copy(color = color))
+    }
+
+    /** The number a numbered item shows: its place in the run of numbered items it belongs to. */
+    fun numberOf(essay: Essay, blockId: String): Int {
+        val at = essay.blocks.indexOfFirst { it.id == blockId }
+        if (at < 0) return 1
+        var n = 1
+        var i = at - 1
+        while (i >= 0 && (essay.blocks[i] as? EssayBlock.Paragraph)?.type == "numbered_list_item") { n++; i-- }
+        return n
     }
 
     private fun Essay.replace(block: EssayBlock): Essay = copy(blocks = blocks.map { if (it.id == block.id) block else it })

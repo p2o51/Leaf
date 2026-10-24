@@ -52,7 +52,8 @@ class FakeNotion : Dispatcher() {
                     Block(id, JSONObject(json.toString()).put("id", id).put("created_time", "2026-10-23T09:00:00.000Z"))
                 }
                 val after = body.optJSONObject("position")?.optJSONObject("after_block")?.optString("id")
-                val at = after?.let { a -> list.indexOfFirst { it.id == a } + 1 } ?: list.size
+                val atStart = body.optJSONObject("position")?.optString("type") == "start"
+                val at = after?.let { a -> list.indexOfFirst { it.id == a } + 1 } ?: if (atStart) 0 else list.size
                 list.addAll(at, created)
                 ok(JSONObject().put("results", JSONArray(created.map { it.json })))
             }

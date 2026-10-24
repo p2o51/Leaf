@@ -68,4 +68,18 @@ class EditorEditsTest {
         assertNull(EditorEdits.fromScribble(remoteOnly, newId))
         assertEquals(listOf("p", "s"), EditorEdits.pickable(listOf(text, remoteOnly, photo.copy(createdAt = Instant.ofEpochSecond(5)))).map { it.id })
     }
+
+    @Test
+    fun should_restyle_and_recolour_a_block_and_number_a_run_of_items_when_styled() {
+        val e = essay(
+            EssayBlock.Paragraph("a", "一", "numbered_list_item"),
+            EssayBlock.Paragraph("b", "二", "numbered_list_item"),
+            EssayBlock.Paragraph("c", "中间"),
+            EssayBlock.Paragraph("d", "重新开始", "numbered_list_item"),
+        )
+        assertEquals(listOf(1, 2, 1), listOf("a", "b", "d").map { EditorEdits.numberOf(e, it) })
+        val styled = EditorEdits.recolor(EditorEdits.restyle(e, "c", "heading_1"), "c", NotionColor.Blue)
+        assertEquals(EssayBlock.Paragraph("c", "中间", "heading_1", NotionColor.Blue), styled.blocks[2])
+        assertEquals(1, EditorEdits.numberOf(styled, "d"))
+    }
 }
