@@ -214,7 +214,13 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                         Box(m) {
                                             HomePane(
                                                 shownScribbles, shownEssays, filter, allScribbles, allEssays, openId,
-                                                vm::openWall, vm::openEssay, { settingsOpen = true }, { scope.launch { drawer.open() } },
+                                                { id, near ->
+                                                    // A search hit can lie outside the filter; the wall it opens
+                                                    // must still have it, so the filter goes first.
+                                                    if (id != null && shownScribbles.none { it.id == id }) vm.setFilter(HomeFilter.All)
+                                                    vm.openWall(id, near)
+                                                },
+                                                vm::openEssay, { settingsOpen = true }, { scope.launch { drawer.open() } },
                                                 Modifier.fillMaxSize(),
                                             )
                                             AddMenu(

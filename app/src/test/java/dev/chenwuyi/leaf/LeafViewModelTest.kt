@@ -100,4 +100,15 @@ class LeafViewModelTest {
         vm.selectAll()
         assertEquals(setOf("s6", "s11", "s18"), vm.wall.value?.selected)
     }
+
+    @Test
+    fun should_drop_scribbles_from_the_selection_when_a_recolour_moves_them_out_of_the_filter() {
+        val vm = vm()
+        vm.setFilter(HomeFilter.ByColor(NotionColor.Green))
+        vm.openWall(null, emptySet())
+        vm.startSelecting("s6")
+        vm.toggleSelected("s11")
+        vm.recolor(setOf("s6"), NotionColor.Red)
+        assertEquals(setOf("s11"), vm.wall.value?.selected)
+    }
 }

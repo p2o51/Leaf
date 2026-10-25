@@ -57,6 +57,14 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
 
     init {
         viewModelScope.launch { seed() }
+        // A scribble recoloured or retagged out of the filter leaves the wall, so it leaves the selection too:
+        // nothing out of sight is deleted, copied or recoloured by the selection bar.
+        viewModelScope.launch {
+            visibleScribbles.collect { shown ->
+                val ids = shown.map(Scribble::id).toSet()
+                wallState.update { w -> if (w == null || w.selected.all { it in ids }) w else w.copy(selected = w.selected intersect ids) }
+            }
+        }
     }
 
     fun setQuery(q: String) = queryState.update { q }
