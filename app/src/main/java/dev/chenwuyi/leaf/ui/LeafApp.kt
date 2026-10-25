@@ -337,7 +337,8 @@ private fun Panes(
 private val CaptureSaver = Saver<Capture?, String>(
     save = { c ->
         when (c) {
-            Capture.Text -> "text"
+            // A shared or selected text arrives as the sheet's starting line; keep it too.
+            is Capture.Text -> "text:" + c.initial
             Capture.Voice -> "voice"
             is Capture.Photo -> (c.picture as? Picture.Local)?.let { "photo:" + it.uri } ?: ""
             null -> ""
@@ -345,7 +346,7 @@ private val CaptureSaver = Saver<Capture?, String>(
     },
     restore = { s ->
         when {
-            s == "text" -> Capture.Text
+            s.startsWith("text:") -> Capture.Text(s.removePrefix("text:"))
             s == "voice" -> Capture.Voice
             s.startsWith("photo:") -> Capture.Photo(Picture.Local(s.removePrefix("photo:")))
             else -> null
