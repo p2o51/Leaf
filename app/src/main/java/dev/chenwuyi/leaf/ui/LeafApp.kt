@@ -29,6 +29,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -49,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.PaneLayout
 import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.paneLayout
@@ -66,6 +70,7 @@ import dev.chenwuyi.leaf.ui.component.LocalWallVisibilityScope
 import dev.chenwuyi.leaf.ui.essay.EssayEditor
 import dev.chenwuyi.leaf.ui.home.AddKind
 import dev.chenwuyi.leaf.ui.home.AddMenu
+import dev.chenwuyi.leaf.ui.home.HomeDrawer
 import dev.chenwuyi.leaf.ui.home.HomePane
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 import dev.chenwuyi.leaf.ui.settings.SettingsScreen
@@ -83,6 +88,12 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
     val allEssays by vm.essays.collectAsStateWithLifecycle()
     val openId by vm.openEssayId.collectAsStateWithLifecycle()
     val wall by vm.wall.collectAsStateWithLifecycle()
+    val filter by vm.filter.collectAsStateWithLifecycle()
+    val shownScribbles by vm.visibleScribbles.collectAsStateWithLifecycle()
+    val shownEssays by vm.visibleEssays.collectAsStateWithLifecycle()
+    val tags by vm.tags.collectAsStateWithLifecycle()
+    val colors by vm.colorsInUse.collectAsStateWithLifecycle()
+    val drawer = rememberDrawerState(DrawerValue.Closed)
     val connection by settings.connection.collectAsStateWithLifecycle()
     val syncStatus by settings.status.collectAsStateWithLifecycle()
     // Saveable, so a theme switch or rotation keeps the page, menu or sheet open instead of dropping to home.
@@ -118,6 +129,8 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
 
     // The page that is drawn on top gets back first, so the handlers go from the bottom page up: the one
     // composed last wins. Pages follow the finger (predictive back); the menu and the sheet just close.
+    // Lowest of all: with nothing else open, back on a filtered home goes back to everything.
+    BackHandler(filter != HomeFilter.All && wall == null && openId == null) { vm.setFilter(HomeFilter.All) }
     val essayBack = rememberBackPreview()
     val wallBack = rememberBackPreview()
     val settingsBack = rememberBackPreview()
@@ -170,31 +183,60 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                     CompositionLocalProvider(LocalWallVisibilityScope provides this) {
                         if (wallOpen) {
                             LaunchedEffect(Unit) { wallBack.reset() }
-                            WallScreen(lastWall, allScribbles, allEssays, wallActions, Modifier.backPose(wallBack))
+                            WallScreen(lastWall, shownScribbles, allEssays, wallActions, Modifier.backPose(wallBack), title = wallTitle(filter))
                         } else {
-                            Panes(
-                                listContent = { m ->
-                                    Box(m) {
-                                        HomePane(allScribbles, allEssays, openId, vm::openWall, vm::openEssay, { settingsOpen = true }, Modifier.fillMaxSize())
-                                        AddMenu(
-                                            menuOpen,
-                                            { menuOpen = it },
-                                            onAdd,
-                                            onHoldStart = {
-                                                capture = Capture.Voice
-                                                // Without the permission the sheet opens and its mic asks first.
-                                                if (context.canRecord()) voice.press()
-                                            },
-                                            onHoldEnd = voice::lift,
-                                        )
-                                    }
+                            // Keep's drawer. It opens from the menu icon in the search bar only; an edge swipe
+                            // stays the system back gesture.
+                            ModalNavigationDrawer(
+                                drawerState = drawer,
+                                gesturesEnabled = drawer.isOpen,
+                                drawerContent = {
+                                    HomeDrawer(
+                                        drawer, filter, colors, tags,
+                                        onPick = { f ->
+                                            vm.setFilter(f)
+                                            scope.launch { drawer.close() }
+                                        },
+                                        onOpenWall = {
+                                            // The drawer is gone before the wall grows out of the strip, so
+                                            // the two never move at once; the wall here means every scribble.
+                                            scope.launch {
+                                                drawer.close()
+                                                vm.setFilter(HomeFilter.All)
+                                                vm.openWall(null, emptySet())
+                                            }
+                                        },
+                                    )
                                 },
-                                editorKey = openEssay?.id,
-                                back = essayBack,
-                                editor = openEssay?.let { e ->
-                                    { m -> EssayEditor(e, allScribbles, syncLine(connection, syncStatus), vm::closeEssay, vm::updateEssay, { id -> vm.removeBlock(e.id, id) }, m) }
-                                },
-                            )
+                            ) {
+                                Panes(
+                                    listContent = { m ->
+                                        Box(m) {
+                                            HomePane(
+                                                shownScribbles, shownEssays, filter, allScribbles, allEssays, openId,
+                                                vm::openWall, vm::openEssay, { settingsOpen = true }, { scope.launch { drawer.open() } },
+                                                Modifier.fillMaxSize(),
+                                            )
+                                            AddMenu(
+                                                menuOpen,
+                                                { menuOpen = it },
+                                                onAdd,
+                                                onHoldStart = {
+                                                    capture = Capture.Voice
+                                                    // Without the permission the sheet opens and its mic asks first.
+                                                    if (context.canRecord()) voice.press()
+                                                },
+                                                onHoldEnd = voice::lift,
+                                            )
+                                        }
+                                    },
+                                    editorKey = openEssay?.id,
+                                    back = essayBack,
+                                    editor = openEssay?.let { e ->
+                                        { m -> EssayEditor(e, allScribbles, syncLine(connection, syncStatus), vm::closeEssay, vm::updateEssay, { id -> vm.removeBlock(e.id, id) }, m) }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -304,3 +346,10 @@ private val CaptureSaver = Saver<Capture?, String>(
         }
     },
 )
+
+/** The wall's heading follows the drawer's pick, so a filtered wall says what it is showing. */
+private fun wallTitle(filter: HomeFilter): String = when (filter) {
+    HomeFilter.All -> "涂鸦墙"
+    is HomeFilter.ByColor -> "${filter.color.label}色"
+    is HomeFilter.ByTag -> "#${filter.name}"
+}

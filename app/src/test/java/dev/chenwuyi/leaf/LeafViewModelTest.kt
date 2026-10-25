@@ -1,6 +1,7 @@
 package dev.chenwuyi.leaf
 
 import dev.chenwuyi.leaf.data.EssayBlock
+import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.InMemoryLeafRepository
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.SampleData
@@ -77,5 +78,26 @@ class LeafViewModelTest {
         vm.openWall("s2", setOf("s3"))
         assertEquals(WallSort.Color, vm.wall.value?.sort)
         assertEquals("s2", vm.wall.value?.focusId)
+    }
+
+    @Test
+    fun should_show_only_matching_scribbles_and_essays_when_a_tag_is_picked() {
+        val vm = vm()
+        vm.setFilter(HomeFilter.ByTag("东京"))
+        assertEquals(setOf("s9", "s10"), vm.visibleScribbles.value.map { it.id }.toSet())
+        assertEquals(listOf("e23"), vm.visibleEssays.value.map { it.id })
+        assertTrue("东京" in vm.tags.value)
+        vm.setFilter(HomeFilter.All)
+        assertEquals(SampleData.scribbles.size, vm.visibleScribbles.value.size)
+    }
+
+    @Test
+    fun should_select_only_what_the_wall_shows_when_selecting_all_under_a_filter() {
+        val vm = vm()
+        vm.setFilter(HomeFilter.ByColor(NotionColor.Green))
+        vm.openWall(null, emptySet())
+        vm.startSelecting()
+        vm.selectAll()
+        assertEquals(setOf("s6", "s11", "s18"), vm.wall.value?.selected)
     }
 }

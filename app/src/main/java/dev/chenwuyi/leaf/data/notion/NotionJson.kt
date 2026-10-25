@@ -23,6 +23,7 @@ data class RemoteRow(
     val pinned: Boolean,
     val coverUrl: String?,
     val editedAt: Instant,
+    val tags: List<String> = emptyList(),
 )
 
 /** An essay body block. [type] is Notion's block type; only text-bearing types are editable in Leaf. */
@@ -40,6 +41,7 @@ object LeafSchema {
     const val TypeWall = "涂鸦墙"
     const val CardColor = "卡片颜色"
     const val Pinned = "置顶"
+    const val Tags = "标签"
     const val WallTitle = "涂鸦墙"
 
     /** The properties PATCH body for whatever is missing, or null when the schema is already complete. */
@@ -87,7 +89,21 @@ object NotionJson {
             pinned = props.optJSONObject(LeafSchema.Pinned)?.optBoolean("checkbox") == true,
             coverUrl = fileUrl(json.optJSONObject("cover")),
             editedAt = Instant.parse(json.getString("last_edited_time")),
+            tags = tags(props),
         )
+    }
+
+    /**
+     * Tags are the 标签 multi-select, or else the row's first multi-select of any name, so a database
+     * that already tags with its own field ("Tags") works as it is. Leaf only reads them; they are
+     * edited in Notion, which is also the only place an option can be renamed.
+     */
+    fun tags(props: JSONObject): List<String> {
+        val field = props.optJSONObject(LeafSchema.Tags)?.takeIf { it.optString("type") == "multi_select" }
+            ?: props.keys().asSequence().mapNotNull { props.optJSONObject(it) }.firstOrNull { it.optString("type") == "multi_select" }
+            ?: return emptyList()
+        val options = field.optJSONArray("multi_select") ?: return emptyList()
+        return (0 until options.length()).mapNotNull { options.optJSONObject(it)?.optString("name")?.trim()?.takeIf(String::isNotEmpty) }
     }
 
     /** Card colour reads the option's Notion colour first, so renamed options still work, then its name. */

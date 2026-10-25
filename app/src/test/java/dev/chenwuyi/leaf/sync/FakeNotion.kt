@@ -28,9 +28,10 @@ class FakeNotion : Dispatcher() {
         .put("image", JSONObject().put("type", "file").put("file", JSONObject().put("url", url))
             .put("caption", JSONArray().apply { if (caption.isNotEmpty()) put(JSONObject().put("plain_text", caption)) })))
 
-    fun row(id: String, title: String, type: String?, edited: String = "2026-10-21T00:00:00.000Z"): JSONObject {
+    fun row(id: String, title: String, type: String?, edited: String = "2026-10-21T00:00:00.000Z", tags: List<String>? = null): JSONObject {
         val props = JSONObject().put("Name", JSONObject().put("type", "title").put("title", JSONArray().put(JSONObject().put("plain_text", title))))
         if (type != null) props.put("类型", JSONObject().put("type", "select").put("select", JSONObject().put("name", type)))
+        if (tags != null) props.put("标签", JSONObject().put("type", "multi_select").put("multi_select", JSONArray(tags.map { JSONObject().put("name", it) })))
         return JSONObject().put("object", "page").put("id", id).put("last_edited_time", edited).put("properties", props)
     }
 

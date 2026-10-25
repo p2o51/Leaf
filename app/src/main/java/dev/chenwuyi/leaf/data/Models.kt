@@ -79,6 +79,8 @@ data class Essay(
     val editedAt: Instant,
     /** The card's text before the body is loaded from Notion. */
     val storedPreview: String = "",
+    /** The row's 标签 multi-select, read from Notion; see [TagRules]. */
+    val tags: List<String> = emptyList(),
 ) {
     val previewText: String
         get() = blocks.filterIsInstance<EssayBlock.Paragraph>().joinToString(" ") { it.text }.trim().ifEmpty { storedPreview }

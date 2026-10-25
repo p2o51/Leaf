@@ -107,6 +107,16 @@ class SyncEngineTest {
     }
 
     @Test
+    fun should_keep_an_essays_notion_tags_when_pulling() = runBlocking {
+        fake.rows += fake.row("p1", "东京第三天", "随笔", tags = listOf("东京", "旅行"))
+        engine.run()
+        assertEquals(listOf("东京", "旅行"), repo.essays.first().single().tags)
+        fake.rows[0] = fake.row("p1", "东京第三天", "随笔", edited = "2026-10-22T00:00:00.000Z", tags = listOf("东京"))
+        engine.run()
+        assertEquals(listOf("东京"), repo.essays.first().single().tags)
+    }
+
+    @Test
     fun should_append_copies_after_the_last_block_when_copying_into_an_essay() = runBlocking {
         db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
         db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default")))

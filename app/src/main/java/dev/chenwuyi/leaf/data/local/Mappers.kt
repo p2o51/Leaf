@@ -43,7 +43,12 @@ fun EssayEntity.toEssay(blocks: List<EssayBlockEntity>): Essay = Essay(
     pinned = pinned,
     editedAt = Instant.ofEpochMilli(editedAt),
     storedPreview = preview,
+    tags = tagList(tags),
 )
+
+fun tagList(stored: String): List<String> = stored.split('\n').filter { it.isNotBlank() }
+
+fun tagColumn(tags: List<String>): String = tags.joinToString("\n")
 
 fun EssayBlockEntity.toBlock(): EssayBlock = when {
     type == "scribble" && scribbleId != null -> EssayBlock.SyncedScribble(id, scribbleId)

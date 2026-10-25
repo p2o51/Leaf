@@ -7,6 +7,7 @@ import dev.chenwuyi.leaf.data.local.LeafDao
 import dev.chenwuyi.leaf.data.local.OutboxEntity
 import dev.chenwuyi.leaf.data.local.OutboxOp
 import dev.chenwuyi.leaf.data.local.ScribbleEntity
+import dev.chenwuyi.leaf.data.local.tagColumn
 import dev.chenwuyi.leaf.data.notion.DataSourceInfo
 import dev.chenwuyi.leaf.data.notion.LeafNotion
 import dev.chenwuyi.leaf.data.notion.LeafSchema
@@ -232,6 +233,7 @@ class SyncEngine(
                 coverUrl = r.coverUrl,
                 preview = preview,
                 bodyLoaded = mine?.bodyLoaded == true && !changed,
+                tags = tagColumn(r.tags),
             )))
         }
         val remoteIds = rows.map { it.pageId }.toSet()

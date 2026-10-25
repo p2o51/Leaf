@@ -178,4 +178,5 @@ fun Essay.toEntity(sample: Boolean = false): EssayEntity = EssayEntity(
     preview = previewText.take(400),
     bodyLoaded = true,
     sample = sample,
+    tags = tagColumn(tags),
 )

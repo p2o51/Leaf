@@ -1,5 +1,6 @@
 package dev.chenwuyi.leaf.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -35,6 +36,9 @@ data class EssayEntity(
     val preview: String = "",
     val bodyLoaded: Boolean = false,
     val sample: Boolean = false,
+    /** The 标签 multi-select, one tag per line (a tag never contains a newline). */
+    @ColumnInfo(defaultValue = "''")
+    val tags: String = "",
 )
 
 /**
