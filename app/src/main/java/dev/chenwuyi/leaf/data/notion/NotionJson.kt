@@ -63,6 +63,8 @@ object LeafSchema {
 }
 
 object NotionJson {
+    private val TagFieldNames = listOf(LeafSchema.Tags, "Tags", "Tag", "Labels", "Label")
+
     val TEXT_TYPES = setOf("paragraph", "heading_1", "heading_2", "heading_3", "quote", "bulleted_list_item", "numbered_list_item", "to_do", "callout", "toggle")
 
     fun dataSource(json: JSONObject): DataSourceInfo {
@@ -94,13 +96,16 @@ object NotionJson {
     }
 
     /**
-     * Tags are the 标签 multi-select, or else the row's first multi-select of any name, so a database
-     * that already tags with its own field ("Tags") works as it is. Leaf only reads them; they are
-     * edited in Notion, which is also the only place an option can be renamed.
+     * Tags are a multi-select named like tags (标签, then Tags / Tag / Labels in any case), or else the
+     * row's first multi-select of any name, so a database that already tags with its own field works as
+     * it is. The names come first because Notion's property order is not the table's: a database with
+     * 作者 and Tags must not read authors as tags. Leaf only reads them; they are edited in Notion, which
+     * is also the only place an option can be renamed.
      */
     fun tags(props: JSONObject): List<String> {
-        val field = props.optJSONObject(LeafSchema.Tags)?.takeIf { it.optString("type") == "multi_select" }
-            ?: props.keys().asSequence().mapNotNull { props.optJSONObject(it) }.firstOrNull { it.optString("type") == "multi_select" }
+        val multi = props.keys().asSequence().mapNotNull { key -> props.optJSONObject(key)?.takeIf { it.optString("type") == "multi_select" }?.let { key to it } }.toList()
+        val field = TagFieldNames.firstNotNullOfOrNull { name -> multi.firstOrNull { it.first.trim().equals(name, ignoreCase = true) }?.second }
+            ?: multi.firstOrNull()?.second
             ?: return emptyList()
         val options = field.optJSONArray("multi_select") ?: return emptyList()
         return (0 until options.length()).mapNotNull { options.optJSONObject(it)?.optString("name")?.trim()?.takeIf(String::isNotEmpty) }

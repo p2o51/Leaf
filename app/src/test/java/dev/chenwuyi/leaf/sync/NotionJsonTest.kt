@@ -46,6 +46,8 @@ class NotionJsonTest {
         assertEquals(listOf("东京", "写作"), NotionJson.row(tagged, "Name").tags)
         val ownField = JSONObject("""{"id":"p","last_edited_time":"2026-10-20T00:00:00.000Z","properties":{"Name":{"type":"title","title":[]},"Tags":{"type":"multi_select","multi_select":[{"name":"Sheaf"}]}}}""")
         assertEquals(listOf("Sheaf"), NotionJson.row(ownField, "Name").tags)
+        val authorsFirst = JSONObject("""{"id":"p","last_edited_time":"2026-10-20T00:00:00.000Z","properties":{"Name":{"type":"title","title":[]},"作者":{"type":"multi_select","multi_select":[{"name":"51"}]},"tags":{"type":"multi_select","multi_select":[{"name":"东京"}]}}}""")
+        assertEquals(listOf("东京"), NotionJson.row(authorsFirst, "Name").tags)
         val none = JSONObject("""{"id":"p","last_edited_time":"2026-10-20T00:00:00.000Z","properties":{"Name":{"type":"title","title":[]}}}""")
         assertEquals(emptyList<String>(), NotionJson.row(none, "Name").tags)
     }
