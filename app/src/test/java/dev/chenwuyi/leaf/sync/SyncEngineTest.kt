@@ -3,6 +3,7 @@ package dev.chenwuyi.leaf.sync
 import android.app.Application
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import dev.chenwuyi.leaf.data.BlockOrder
 import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.local.EssayBlockEntity
@@ -258,6 +259,43 @@ class SyncEngineTest {
         assertEquals(listOf("k2", "k3", "k1"), local.map { it.id })
         assertEquals(sent[2].id, local.last().blockId)
         assertTrue(fake.log.any { it.startsWith("DELETE blocks/x1") })
+    }
+
+    @Test
+    fun should_keep_a_moved_photo_in_notion_until_its_copy_is_uploaded() = runBlocking {
+        var online = false
+        val photos = SyncEngine(db.dao(), LeafNotion(NotionClient(baseUrl = "http://127.0.0.1:${server.port}/v1/".toHttpUrl(), requestIntervalMillis = 0)), store,
+            downloadPhoto = { url -> if (online && url == "https://fresh") byteArrayOf(1, 2, 3) else null })
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(
+            EssayBlockEntity("k1", "e1", 0, "x1", "image", "路口", "default", photo = "https://expired"),
+            EssayBlockEntity("k2", "e1", 1, "x2", "paragraph", "二", "default"),
+        ))
+        fake.children["p1"] = mutableListOf(fake.image("x1", "https://fresh", "路口"), fake.paragraph("x2", "二"))
+        repo.moveBlock("e1", "k1", 1)
+
+        // The download fails: the original stays and the move waits for another run.
+        photos.run(pull = false)
+        assertEquals(listOf("x1", "x2"), fake.children.getValue("p1").map { it.id })
+        assertTrue(fake.log.none { it.startsWith("DELETE blocks/x1") })
+        assertEquals(1, db.dao().pendingOps().size)
+
+        // Back online, the expired URL is swapped for Notion's fresh one and the copy goes after 二.
+        online = true
+        photos.run(pull = false)
+        val sent = fake.children.getValue("p1")
+        assertEquals(listOf("x2", "image"), sent.map { if (it.id == "x2") it.id else it.json.getString("type") })
+        assertEquals(sent[1].id, db.dao().block("k1")?.blockId)
+        assertTrue(db.dao().pendingOps().isEmpty())
+    }
+
+    @Test
+    fun should_not_offer_to_move_a_block_with_content_leaf_did_not_load() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0)))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "一"), fake.paragraph("x2", "二").apply { json.put("has_children", true) })
+        engine.loadBody("e1")
+        val blocks = repo.essays.first().single().blocks
+        assertEquals(listOf(true, false), blocks.map { BlockOrder.movable(it) })
     }
 
     @Test

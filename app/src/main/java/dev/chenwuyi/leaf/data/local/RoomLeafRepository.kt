@@ -139,11 +139,10 @@ class RoomLeafRepository(
         val moved = rows.firstOrNull { it.id == blockId } ?: return@withLock
         val reordered = BlockOrder.moveAt(rows, rows.indexOf(moved), toIndex)
         if (reordered.map { it.id } == rows.map { it.id }) return@withLock
-        val oldBlockId = moved.blockId
-        dao.upsertBlocks(reordered.mapIndexed { i, row -> if (row.id == blockId) row.copy(position = i, blockId = null) else row.copy(position = i) })
+        dao.upsertBlocks(reordered.mapIndexed { i, row -> row.copy(position = i) })
         dao.essay(essayId)?.let { dao.upsertEssays(listOf(it.copy(editedAt = clock().toEpochMilli()))) }
-        queue(OutboxOp.SaveBlock, blockId)
-        oldBlockId?.let { queue(OutboxOp.DeleteBlock, it) }
+        // A block not in Notion yet is created at wherever it sits when its SaveBlock runs.
+        if (moved.blockId != null) queue(OutboxOp.MoveBlock, blockId)
     }
 
     override suspend fun setCover(essayId: String, cover: Picture?) {

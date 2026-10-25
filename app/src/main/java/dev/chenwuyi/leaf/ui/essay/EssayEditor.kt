@@ -440,7 +440,8 @@ fun EssayEditor(
                                     }
                                 }
                                 // The text block being edited shows its handle in the margin; dragging it moves the block.
-                                if (block is EssayBlock.Paragraph) {
+                                // One holding more in Notion than Leaf can write back (children, formatting) has none.
+                                if (block is EssayBlock.Paragraph && BlockOrder.movable(block)) {
                                     val handle by animateFloatAsState(if (focused == block.id || dragging) 1f else 0f, LeafMotion.tool(), label = "handle")
                                     if (handle > 0f) {
                                         Box(

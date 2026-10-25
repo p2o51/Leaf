@@ -50,6 +50,8 @@ class FakeNotion : Dispatcher() {
         return when {
             request.method == "GET" && parts[0] == "blocks" && parts.getOrNull(2) == "children" ->
                 ok(JSONObject().put("results", JSONArray(children[parts[1]].orEmpty().map { it.json })).put("has_more", false))
+            request.method == "GET" && parts[0] == "blocks" && parts.size == 2 ->
+                children.values.flatten().firstOrNull { it.id == parts[1] }?.let { ok(it.json) } ?: MockResponse().setResponseCode(404).setBody("""{"object":"error","code":"object_not_found"}""")
             request.method == "PATCH" && parts[0] == "blocks" && parts.getOrNull(2) == "children" -> {
                 duringAppend()
                 val list = children.getOrPut(parts[1]) { mutableListOf() }

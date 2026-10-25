@@ -56,6 +56,8 @@ sealed interface EssayBlock {
         val text: String,
         val type: String = "paragraph",
         val color: NotionColor = NotionColor.Default,
+        /** Holds more in Notion than Leaf can write back (children, links, formatting), so it stays in place. */
+        val fixed: Boolean = false,
     ) : EssayBlock
 
     /** A Notion block Leaf does not edit (table, embed, database…). Shown as a card, left untouched. */

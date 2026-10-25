@@ -86,6 +86,9 @@ class LeafNotion(private val client: NotionClient = NotionClient()) {
         return response.optJSONArray("results").objects().map { it.getString("id") to Instant.parse(it.getString("created_time")) }
     }
 
+    /** One block as Notion has it now; an image's file URL is freshly signed. */
+    suspend fun block(token: String, blockId: String): RemoteBlock? = NotionJson.bodyBlock(client.get(token, "blocks/$blockId"))
+
     suspend fun updateBlock(token: String, blockId: String, body: JSONObject) {
         client.patch(token, "blocks/$blockId", body)
     }

@@ -59,6 +59,8 @@ data class EssayBlockEntity(
     val scribbleId: String? = null,
     /** Image blocks only: file:// for a photo still to upload, https:// for one already in Notion. */
     val photo: String? = null,
+    /** A Notion text block Leaf cannot rewrite losslessly (RemoteBlock.fixed), so it is not dragged. */
+    @ColumnInfo(defaultValue = "0") val fixed: Boolean = false,
 )
 
 /** One change waiting to reach Notion. Processed strictly in [seq] order so creations precede edits. */
@@ -77,6 +79,11 @@ object OutboxOp {
     const val SaveBlock = "save_block"
     /** Removes an essay block from Notion; [OutboxEntity.targetId] is the Notion block ID. */
     const val DeleteBlock = "delete_block"
+    /**
+     * Writes an essay block again after its new neighbour, then deletes the old one (Notion has no move).
+     * Target: the block's local ID, whose row still holds the old Notion block ID until the copy exists.
+     */
+    const val MoveBlock = "move_block"
     /** Sets or clears an essay's cover from its row's coverUrl (file:// uploads, null clears). Target: the essay's local ID. */
     const val SaveCover = "save_cover"
     /** Moves an essay page to Notion's trash; [OutboxEntity.targetId] is the Notion page ID. */

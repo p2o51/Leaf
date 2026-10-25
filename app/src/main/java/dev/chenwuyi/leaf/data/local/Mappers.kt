@@ -55,12 +55,12 @@ fun tagColumn(tags: List<String>): String = tags.joinToString("\n")
 fun EssayBlockEntity.toBlock(): EssayBlock = when {
     type == "scribble" && scribbleId != null -> EssayBlock.SyncedScribble(id, scribbleId)
     type == "image" && photo != null -> EssayBlock.Photo(id, if (photo.startsWith("http")) Picture.Remote(photo) else Picture.Local(photo), text)
-    type in NotionJson.TEXT_TYPES -> EssayBlock.Paragraph(id, text, type, NotionColor.fromApi(color))
+    type in NotionJson.TEXT_TYPES -> EssayBlock.Paragraph(id, text, type, NotionColor.fromApi(color), fixed)
     else -> EssayBlock.Other(id, type)
 }
 
 fun EssayBlock.toEntity(essayId: String, position: Int, blockId: String?): EssayBlockEntity = when (this) {
-    is EssayBlock.Paragraph -> EssayBlockEntity(id, essayId, position, blockId, type, text, color.apiName)
+    is EssayBlock.Paragraph -> EssayBlockEntity(id, essayId, position, blockId, type, text, color.apiName, fixed = fixed)
     is EssayBlock.SyncedScribble -> EssayBlockEntity(id, essayId, position, blockId, "scribble", "", NotionColor.Default.apiName, scribbleId)
     is EssayBlock.Other -> EssayBlockEntity(id, essayId, position, blockId, type, "", NotionColor.Default.apiName)
     is EssayBlock.Photo -> EssayBlockEntity(

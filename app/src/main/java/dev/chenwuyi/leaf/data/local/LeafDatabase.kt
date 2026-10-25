@@ -35,10 +35,14 @@ abstract class LeafDatabase : RoomDatabase() {
             }
         }
 
-        /** 4: essays keep the day they were written, for the page's date line. */
+        /** 4: essays keep the day they were written, for the page's date line; blocks know if they can move. */
         val Migration3To4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE essays ADD COLUMN createdAt INTEGER")
+                // Blocks learn whether they can be moved; until each body loads again, synced text stays put.
+                db.execSQL("ALTER TABLE essay_blocks ADD COLUMN fixed INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE essay_blocks SET fixed = 1 WHERE blockId IS NOT NULL AND type NOT IN ('image', 'divider')")
+                db.execSQL("UPDATE essays SET bodyLoaded = 0 WHERE pageId IS NOT NULL")
             }
         }
     }

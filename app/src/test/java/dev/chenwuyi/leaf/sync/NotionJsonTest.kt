@@ -85,4 +85,22 @@ class NotionJsonTest {
     fun should_extract_a_dashed_id_when_given_a_notion_url() {
         assertEquals("1234abcd-0000-1111-2222-333344445555", NotionClient.extractId("https://www.notion.so/ws/Leaf-1234abcd000011112222333344445555?v=99"))
     }
+
+    @Test
+    fun should_mark_blocks_leaf_cannot_rewrite_as_fixed_when_reading_a_body() {
+        fun block(type: String, value: JSONObject, children: Boolean = false) = NotionJson.bodyBlock(JSONObject()
+            .put("object", "block").put("id", "b").put("type", type).put("has_children", children).put(type, value))!!
+        fun words(text: String, bold: Boolean = false, link: String? = null) = org.json.JSONArray().put(JSONObject()
+            .put("type", "text").put("plain_text", text)
+            .put("text", JSONObject().put("content", text).put("link", link?.let { JSONObject().put("url", it) } ?: JSONObject.NULL))
+            .put("annotations", JSONObject().put("bold", bold).put("color", "default")))
+
+        assertFalse(block("paragraph", JSONObject().put("rich_text", words("早上"))).fixed)
+        assertFalse(block("to_do", JSONObject().put("rich_text", words("买菜")).put("checked", false)).fixed)
+        assertTrue(block("paragraph", JSONObject().put("rich_text", words("早上")), children = true).fixed)
+        assertTrue(block("paragraph", JSONObject().put("rich_text", words("早上", bold = true))).fixed)
+        assertTrue(block("paragraph", JSONObject().put("rich_text", words("早上", link = "https://example.com"))).fixed)
+        assertTrue(block("to_do", JSONObject().put("rich_text", words("买菜")).put("checked", true)).fixed)
+        assertTrue(block("callout", JSONObject().put("rich_text", words("提示"))).fixed)
+    }
 }

@@ -125,7 +125,8 @@ object BlockOrder {
      * not know stay where they are.
      */
     fun movable(block: EssayBlock): Boolean = when (block) {
-        is EssayBlock.Paragraph, is EssayBlock.Photo -> true
+        is EssayBlock.Paragraph -> !block.fixed
+        is EssayBlock.Photo -> true
         is EssayBlock.Other -> block.type == EssayBlock.Divider
         is EssayBlock.SyncedScribble -> false
     }
