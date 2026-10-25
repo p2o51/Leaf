@@ -12,6 +12,10 @@ import dev.chenwuyi.leaf.data.sync.NotionSetup
 import dev.chenwuyi.leaf.data.sync.SyncEngine
 import dev.chenwuyi.leaf.data.sync.SyncScheduler
 import dev.chenwuyi.leaf.data.voice.ScribeTranscriber
+import dev.chenwuyi.leaf.quick.WidgetUpdates
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class LeafApplication : Application() {
     lateinit var container: AppContainer
@@ -26,6 +30,8 @@ class LeafApplication : Application() {
 
 /** Everything long-lived, built once per process. */
 class AppContainer(context: Context) {
+    /** Work that outlives a screen, such as a quick capture still saving after its sheet closed. */
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val database = LeafDatabase.open(context)
     private val photos = PhotoStore(context)
     val connection = PrefsConnectionStore(context)
@@ -42,4 +48,8 @@ class AppContainer(context: Context) {
         importPhoto = photos::import,
         loadBody = sync::loadBody,
     )
+
+    init {
+        WidgetUpdates.start(context, scope, repository.scribbles)
+    }
 }

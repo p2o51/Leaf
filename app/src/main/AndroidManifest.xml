@@ -28,6 +28,60 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Quick capture: the tile, shortcuts, widget, 分享到 Leaf and selected text all open this sheet. -->
+        <activity
+            android:name=".quick.QuickCaptureActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/quick_write"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.chenwuyi.leaf.capture"
+            android:theme="@style/Theme.Leaf.Capture"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="dev.chenwuyi.leaf.action.WRITE" />
+                <action android:name="dev.chenwuyi.leaf.action.SPEAK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter android:label="@string/app_name">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter android:label="@string/quick_process_text">
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".quick.CaptureTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_leaf"
+            android:label="@string/quick_write"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".quick.LeafWidget"
+            android:exported="false"
+            android:label="@string/widget_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/leaf_widget_info" />
+        </receiver>
     </application>
 </manifest>
