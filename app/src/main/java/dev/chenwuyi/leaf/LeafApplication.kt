@@ -5,9 +5,12 @@ import android.content.Context
 import dev.chenwuyi.leaf.data.local.LeafDatabase
 import dev.chenwuyi.leaf.data.local.PhotoStore
 import dev.chenwuyi.leaf.data.local.RoomLeafRepository
+import dev.chenwuyi.leaf.data.notion.HttpNotionOAuthRelay
 import dev.chenwuyi.leaf.data.notion.LeafNotion
+import dev.chenwuyi.leaf.data.notion.NotionOAuthConfig
 import dev.chenwuyi.leaf.data.settings.PrefsConnectionStore
 import dev.chenwuyi.leaf.data.settings.VaultRelayStore
+import dev.chenwuyi.leaf.data.sync.NotionAuth
 import dev.chenwuyi.leaf.data.sync.NotionSetup
 import dev.chenwuyi.leaf.data.sync.SyncEngine
 import dev.chenwuyi.leaf.data.sync.SyncScheduler
@@ -38,9 +41,10 @@ class AppContainer(context: Context) {
     val relay = VaultRelayStore(context)
     val transcriber = ScribeTranscriber()
     private val notion = LeafNotion()
-    val sync = SyncEngine(database.dao(), notion, connection, readPhoto = photos::read, downloadPhoto = photos::download)
+    private val oauth = if (NotionOAuthConfig.enabled) HttpNotionOAuthRelay() else null
+    val sync = SyncEngine(database.dao(), notion, connection, readPhoto = photos::read, downloadPhoto = photos::download, auth = NotionAuth(connection, oauth))
     val scheduler = SyncScheduler(context)
-    val setup = NotionSetup(notion, connection, database.dao(), sync)
+    val setup = NotionSetup(notion, connection, database.dao(), sync, oauth)
     val repository = RoomLeafRepository(
         dao = database.dao(),
         isConnected = { connection.connection.value != null },

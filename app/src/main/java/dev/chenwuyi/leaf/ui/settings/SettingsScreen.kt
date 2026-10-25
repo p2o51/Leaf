@@ -3,6 +3,8 @@ package dev.chenwuyi.leaf.ui.settings
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,9 +22,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Login
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Storage
@@ -52,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chenwuyi.leaf.BuildConfig
 import dev.chenwuyi.leaf.CrashLog
+import dev.chenwuyi.leaf.data.notion.NotionCredential
 import dev.chenwuyi.leaf.data.settings.Connection
 import dev.chenwuyi.leaf.data.sync.SyncStatus
 
@@ -124,22 +129,37 @@ private fun NotionGroup(vm: SettingsViewModel, connection: Connection?, status: 
     }
     when (step) {
         is ConnectStep.Token -> {
-            var token by rememberSaveable { mutableStateOf("") }
-            SettingsSection("Notion") {
-                PanelBlock("集成密钥") {
-                    SecretField(token, { token = it }, "ntn_…")
-                    Button(onClick = { vm.discover(token) }, enabled = token.isNotBlank() && !step.busy) { Text(if (step.busy) "正在检查…" else "下一步") }
+            var useToken by rememberSaveable { mutableStateOf(!vm.signInAvailable) }
+            if (!useToken) {
+                val context = LocalContext.current
+                SettingsSection("Notion") {
+                    ActionRow(Icons.AutoMirrored.Rounded.Login, "用 Notion 登录", value = if (step.busy) "正在连接…" else null, enabled = !step.busy) {
+                        openInBrowser(context, vm.signInUrl())
+                    }
+                    ActionRow(Icons.Rounded.Key, "改用集成密钥", enabled = !step.busy) { useToken = true }
                 }
+                if (step.error != null) SettingsHint(step.error, MaterialTheme.colorScheme.error)
+                SettingsHint("在 Notion 的授权页勾上要用的数据库，回来再选一个。凭据只存在这台设备的加密存储里。")
+            } else {
+                var token by rememberSaveable { mutableStateOf("") }
+                SettingsSection("Notion") {
+                    PanelBlock("集成密钥") {
+                        SecretField(token, { token = it }, "ntn_…")
+                        Button(onClick = { vm.discover(token) }, enabled = token.isNotBlank() && !step.busy) { Text(if (step.busy) "正在检查…" else "下一步") }
+                    }
+                    if (vm.signInAvailable) ActionRow(Icons.AutoMirrored.Rounded.Login, "改用 Notion 登录", enabled = !step.busy) { useToken = false }
+                }
+                if (step.error != null) SettingsHint(step.error, MaterialTheme.colorScheme.error)
+                SettingsHint("在 notion.so/profile/integrations 新建内部集成，在数据库的 ··· › 连接 里选上它，再把密钥贴在这里。密钥只存在这台设备的加密存储里。")
             }
-            if (step.error != null) SettingsHint(step.error, MaterialTheme.colorScheme.error)
-            SettingsHint("在 notion.so/profile/integrations 新建内部集成，在数据库的 ··· › 连接 里选上它，再把密钥贴在这里。密钥只存在这台设备的加密存储里。")
         }
         is ConnectStep.Pick -> {
             SettingsSection("选一个数据库 · ${step.workspace}") {
                 step.sources.forEach { source ->
                     ActionRow(Icons.Rounded.Storage, source.name, value = "${source.properties.size} 个字段", enabled = !step.busy) { vm.connect(source) }
                 }
-                ActionRow(Icons.AutoMirrored.Rounded.ArrowBack, "换一个密钥", enabled = !step.busy, onClick = vm::back)
+                val again = if (step.credential is NotionCredential.OAuth) "重新登录" else "换一个密钥"
+                ActionRow(Icons.AutoMirrored.Rounded.ArrowBack, again, enabled = !step.busy, onClick = vm::back)
             }
             if (step.error != null) SettingsHint(step.error, MaterialTheme.colorScheme.error)
             SettingsHint(if (step.busy) "正在连接…" else "Leaf 会补上缺的字段，并在里面找或新建一行「涂鸦墙」。")
@@ -181,6 +201,11 @@ private fun AboutGroup() {
             crash = null
         }
     }
+}
+
+private fun openInBrowser(context: Context, url: String) {
+    // No browser at all is rare (work profiles, kiosk setups); the token stays as the way in.
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
 }
 
 private fun copy(context: Context, text: String) {

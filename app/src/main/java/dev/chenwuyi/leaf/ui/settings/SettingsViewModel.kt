@@ -3,7 +3,10 @@ package dev.chenwuyi.leaf.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.chenwuyi.leaf.data.notion.DataSourceInfo
+import dev.chenwuyi.leaf.data.notion.NotionCredential
 import dev.chenwuyi.leaf.data.notion.NotionException
+import dev.chenwuyi.leaf.data.notion.NotionOAuthResult
+import dev.chenwuyi.leaf.data.notion.NotionOAuthSession
 import dev.chenwuyi.leaf.data.settings.Connection
 import dev.chenwuyi.leaf.data.settings.MemoryRelayStore
 import dev.chenwuyi.leaf.data.settings.RelayConnection
@@ -19,10 +22,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** The connect flow: paste a token, pick a database, done. */
+/** The connect flow: sign in with Notion (or paste a token), pick a database, done. */
 sealed interface ConnectStep {
     data class Token(val busy: Boolean = false, val error: String? = null) : ConnectStep
-    data class Pick(val token: String, val workspace: String, val sources: List<DataSourceInfo>, val busy: Boolean = false, val error: String? = null) : ConnectStep
+    data class Pick(val credential: NotionCredential, val workspace: String, val sources: List<DataSourceInfo>, val busy: Boolean = false, val error: String? = null) : ConnectStep
 }
 
 class SettingsViewModel(
@@ -32,9 +35,46 @@ class SettingsViewModel(
     private val syncNow: () -> Unit,
     private val afterDisconnect: suspend () -> Unit,
     private val relay: RelayStore = MemoryRelayStore(),
+    private val oauth: NotionOAuthSession = NotionOAuthSession(),
 ) : ViewModel() {
     private val stepState = MutableStateFlow<ConnectStep>(ConnectStep.Token())
     val step: StateFlow<ConnectStep> = stepState.asStateFlow()
+
+    /** Step 1 leads with 用 Notion 登录; the integration token stays as the fallback. */
+    val signInAvailable: Boolean get() = setup.signInAvailable
+
+    init {
+        // The browser comes back through NotionOAuthActivity, which leaves the callback in [oauth].
+        viewModelScope.launch { oauth.result.collect { if (it != null) finishSignIn() } }
+    }
+
+    /** The relay's start page, for settings to open in the browser. */
+    fun signInUrl(): String {
+        stepState.value = ConnectStep.Token()
+        return oauth.start()
+    }
+
+    private fun finishSignIn() {
+        when (val result = oauth.consume()) {
+            null, NotionOAuthResult.Cancelled -> Unit
+            is NotionOAuthResult.Failed -> stepState.value = ConnectStep.Token(error = result.message)
+            is NotionOAuthResult.Code -> {
+                stepState.value = ConnectStep.Token(busy = true)
+                viewModelScope.launch {
+                    stepState.value = try {
+                        val credential = setup.exchange(result.code)
+                        val (workspace, sources) = setup.discover(credential.accessToken)
+                        if (sources.isEmpty()) ConnectStep.Token(error = "这次授权没有勾选数据库：再登录一次，在 Notion 的授权页里勾上要用的数据库")
+                        else ConnectStep.Pick(credential, workspace, sources)
+                    } catch (failure: NotionException) {
+                        ConnectStep.Token(error = failure.userMessage)
+                    } catch (_: IOException) {
+                        ConnectStep.Token(error = "连不上 Notion，检查一下网络")
+                    }
+                }
+            }
+        }
+    }
 
     /** The Relay used for 按住说, by host; null when none is saved. */
     val relayHost: StateFlow<String?> = relay.host
@@ -74,7 +114,7 @@ class SettingsViewModel(
             stepState.value = try {
                 val (workspace, sources) = setup.discover(token)
                 if (sources.isEmpty()) ConnectStep.Token(error = "这个集成还看不到任何数据库：在 Notion 里打开数据库，右上角 ··· → 连接 → 选你的集成")
-                else ConnectStep.Pick(token.trim(), workspace, sources)
+                else ConnectStep.Pick(NotionCredential.Integration(token.trim()), workspace, sources)
             } catch (failure: NotionException) {
                 ConnectStep.Token(error = failure.userMessage)
             } catch (_: IOException) {
@@ -88,7 +128,7 @@ class SettingsViewModel(
         stepState.value = pick.copy(busy = true, error = null)
         viewModelScope.launch {
             try {
-                setup.connect(pick.token, pick.workspace, source)
+                setup.connect(pick.credential, pick.workspace, source)
                 stepState.value = ConnectStep.Token()
             } catch (failure: NotionException) {
                 stepState.update { pick.copy(busy = false, error = failure.userMessage) }

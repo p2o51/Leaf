@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.chenwuyi.leaf.data.notion.NotionOAuthSession
 import dev.chenwuyi.leaf.ui.LeafApp
 import dev.chenwuyi.leaf.ui.LeafViewModel
 import dev.chenwuyi.leaf.ui.settings.SettingsViewModel
@@ -33,6 +34,7 @@ class MainActivity : ComponentActivity() {
                         syncNow = container.scheduler::now,
                         afterDisconnect = container.repository::seedSamplesIfEmpty,
                         relay = container.relay,
+                        oauth = NotionOAuthSession.shared,
                     )
                 }
                 LeafApp(vm, settings)

@@ -16,6 +16,9 @@ class FakeNotion : Dispatcher() {
     val log = CopyOnWriteArrayList<String>()
     private var next = 1
 
+    /** When set, any other bearer token is turned down with 401, as Notion does once a token is refreshed away. */
+    @Volatile var validToken: String? = null
+
     /** Runs while an append is in flight, before Notion answers: for edits that race a push. */
     var duringAppend: () -> Unit = {}
 
@@ -40,6 +43,9 @@ class FakeNotion : Dispatcher() {
         val raw = request.body.readUtf8()
         val body = raw.takeIf { it.isNotBlank() }?.let { runCatching { JSONObject(it) }.getOrNull() }
         log += "${request.method} $path${body?.let { " $it" } ?: ""}"
+        validToken?.let { valid ->
+            if (request.getHeader("Authorization") != "Bearer $valid") return MockResponse().setResponseCode(401).setBody("""{"object":"error","code":"unauthorized"}""")
+        }
         val parts = path.split('/')
         return when {
             request.method == "GET" && parts[0] == "blocks" && parts.getOrNull(2) == "children" ->
@@ -66,6 +72,9 @@ class FakeNotion : Dispatcher() {
                 children.values.forEach { list -> list.removeAll { it.id == parts[1] } }
                 ok(JSONObject().put("id", parts[1]))
             }
+            request.method == "GET" && path == "users/me" -> ok(JSONObject().put("object", "user").put("bot", JSONObject().put("workspace_name", "WS")))
+            request.method == "POST" && path == "search" -> ok(JSONObject().put("results", JSONArray().put(dataSource())).put("has_more", false))
+            request.method == "GET" && parts[0] == "data_sources" && parts.size == 2 -> ok(dataSource())
             parts[0] == "data_sources" && parts.getOrNull(2) == "query" -> ok(JSONObject().put("results", JSONArray(rows)).put("has_more", false))
             request.method == "POST" && path == "pages" -> {
                 val id = "page-${next++}"
@@ -78,6 +87,15 @@ class FakeNotion : Dispatcher() {
             else -> MockResponse().setResponseCode(404).setBody("""{"object":"error"}""")
         }
     }
+
+    /** The one data source, already carrying every field Leaf needs, so connecting adds none. */
+    fun dataSource(): JSONObject = JSONObject().put("object", "data_source").put("id", "ds")
+        .put("title", JSONArray().put(JSONObject().put("plain_text", "随笔库")))
+        .put("properties", JSONObject()
+            .put("Name", JSONObject().put("id", "title").put("name", "Name").put("type", "title"))
+            .put("类型", JSONObject().put("id", "t").put("name", "类型").put("type", "select"))
+            .put("卡片颜色", JSONObject().put("id", "c").put("name", "卡片颜色").put("type", "select"))
+            .put("置顶", JSONObject().put("id", "p").put("name", "置顶").put("type", "checkbox")))
 
     private fun ok(json: JSONObject) = MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json").setBody(json.toString())
 }

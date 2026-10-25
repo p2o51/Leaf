@@ -32,6 +32,21 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
+        <!-- 用 Notion 登录: notion-oauth-relay sends the browser back here; it hands the code to settings and finishes. -->
+        <activity
+            android:name=".ui.settings.NotionOAuthActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="leaf" android:host="notion-oauth" />
+            </intent-filter>
+        </activity>
 
         <!-- Quick capture: the tile, shortcuts, widget, 分享到 Leaf and selected text all open this sheet. -->
         <activity
