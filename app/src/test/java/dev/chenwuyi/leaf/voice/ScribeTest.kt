@@ -1,7 +1,7 @@
 package dev.chenwuyi.leaf.voice
 
 import android.app.Application
-import dev.chenwuyi.leaf.data.settings.RelayConnection
+import dev.chenwuyi.leaf.data.settings.ElevenLabsKey
 import dev.chenwuyi.leaf.data.voice.ScribeTranscriber
 import dev.chenwuyi.leaf.data.voice.VoiceException
 import dev.chenwuyi.leaf.data.voice.joinTranscript
@@ -19,31 +19,29 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [35])
-class RelayAndScribeTest {
-    private val token = "dev-local-not-secret-token"
+class ScribeTest {
+    private val key = "sk_dev_local_not_secret_0000"
 
     @Test
-    fun should_accept_only_well_formed_connection_strings_when_parsing() {
-        val ok = RelayConnection.parse("  https://relay.example.workers.dev/#token=$token ")!!
-        assertEquals("https://relay.example.workers.dev", ok.baseUrl)
-        assertEquals("relay.example.workers.dev", ok.host)
-        assertNull(RelayConnection.parse("https://relay.example.workers.dev/"))
-        assertNull(RelayConnection.parse("http://relay.example.workers.dev/#token=$token"))
-        assertNull(RelayConnection.parse("https://relay.example.workers.dev/x#token=$token"))
-        assertNull(RelayConnection.parse("https://relay.example.workers.dev/#token=short"))
-        assertTrue(RelayConnection.parse("http://127.0.0.1:8787/#token=$token") != null)
+    fun should_accept_only_key_shaped_text_when_parsing_a_pasted_key() {
+        assertEquals(key, ElevenLabsKey.parse("  $key\n"))
+        assertNull(ElevenLabsKey.parse("https://relay.example.workers.dev/#token=$key"))
+        assertNull(ElevenLabsKey.parse("sk_short"))
+        assertNull(ElevenLabsKey.parse("sk_dev local not secret 0000"))
+        assertNull(ElevenLabsKey.parse(null))
+        assertEquals("sk_…0000", ElevenLabsKey.masked(key))
     }
 
     @Test
-    fun should_send_pcm_to_the_relay_with_its_token_when_transcribing() = runBlocking {
+    fun should_send_pcm_to_elevenlabs_with_the_key_when_transcribing() = runBlocking {
         val server = MockWebServer().apply { start() }
         try {
             server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json").setBody("""{"text":" 好的工具应该安静 "}"""))
-            val relay = RelayConnection("http://127.0.0.1:${server.port}", token)
-            assertEquals("好的工具应该安静", ScribeTranscriber().transcribe(ByteArray(32_000), relay))
+            assertEquals("好的工具应该安静", ScribeTranscriber(baseUrl = "http://127.0.0.1:${server.port}").transcribe(ByteArray(32_000), key))
             val request = server.takeRequest()
-            assertEquals("/v1/speech/elevenlabs/v1/speech-to-text", request.path)
-            assertEquals("Bearer $token", request.getHeader("Authorization"))
+            assertEquals("/v1/speech-to-text", request.path)
+            assertEquals(key, request.getHeader("xi-api-key"))
+            assertNull(request.getHeader("Authorization"))
             val body = request.body.readUtf8()
             assertTrue(body.contains("scribe_v2"))
             assertTrue(body.contains("pcm_s16le_16"))
@@ -53,16 +51,24 @@ class RelayAndScribeTest {
     }
 
     @Test
-    fun should_report_busy_when_the_relay_is_rate_limited() = runBlocking {
+    fun should_report_busy_when_elevenlabs_is_rate_limited() = runBlocking {
+        assertEquals(VoiceException.Kind.Busy, failureFor(429))
+    }
+
+    @Test
+    fun should_report_a_refused_key_when_elevenlabs_answers_401() = runBlocking {
+        assertEquals(VoiceException.Kind.Unauthorized, failureFor(401))
+    }
+
+    private suspend fun failureFor(code: Int): VoiceException.Kind {
         val server = MockWebServer().apply { start() }
         try {
-            server.enqueue(MockResponse().setResponseCode(429).setBody("{}"))
-            try {
-                ScribeTranscriber().transcribe(ByteArray(32_000), RelayConnection("http://127.0.0.1:${server.port}", token))
-                fail("expected a failure")
-            } catch (busy: VoiceException) {
-                assertEquals(VoiceException.Kind.Busy, busy.kind)
-            }
+            server.enqueue(MockResponse().setResponseCode(code).setBody("{}"))
+            ScribeTranscriber(baseUrl = "http://127.0.0.1:${server.port}").transcribe(ByteArray(32_000), key)
+            fail("expected a failure")
+            error("unreachable")
+        } catch (failure: VoiceException) {
+            return failure.kind
         } finally {
             server.shutdown()
         }
