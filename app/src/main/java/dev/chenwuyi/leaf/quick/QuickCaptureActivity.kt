@@ -74,7 +74,11 @@ class QuickCaptureActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        QuickIntents.capture(intent)?.let { capture = it }
+        QuickIntents.capture(intent)?.let {
+            // Recreation (a rotation) rebuilds the sheet from the activity's intent, so it must be the latest one.
+            setIntent(intent)
+            capture = it
+        }
     }
 
     override fun finish() {
