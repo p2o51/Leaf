@@ -46,7 +46,7 @@ class LeafWidget : AppWidgetProvider() {
             ids.forEach { manager.updateAppWidget(it, views) }
         }
 
-        private fun views(context: Context, lines: List<String>): RemoteViews {
+        internal fun views(context: Context, lines: List<String>): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_wall)
             val rows = listOf(R.id.widget_line_1, R.id.widget_line_2, R.id.widget_line_3)
             rows.forEachIndexed { i, id ->
