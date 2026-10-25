@@ -8,8 +8,9 @@ import dev.chenwuyi.leaf.data.local.RoomLeafRepository
 import dev.chenwuyi.leaf.data.notion.HttpNotionOAuthRelay
 import dev.chenwuyi.leaf.data.notion.LeafNotion
 import dev.chenwuyi.leaf.data.notion.NotionOAuthConfig
+import dev.chenwuyi.leaf.data.settings.PrefsAppearanceStore
 import dev.chenwuyi.leaf.data.settings.PrefsConnectionStore
-import dev.chenwuyi.leaf.data.settings.VaultRelayStore
+import dev.chenwuyi.leaf.data.settings.VaultSpeechKeyStore
 import dev.chenwuyi.leaf.data.sync.NotionAuth
 import dev.chenwuyi.leaf.data.sync.NotionSetup
 import dev.chenwuyi.leaf.data.sync.SyncEngine
@@ -38,7 +39,8 @@ class AppContainer(context: Context) {
     private val database = LeafDatabase.open(context)
     private val photos = PhotoStore(context)
     val connection = PrefsConnectionStore(context)
-    val relay = VaultRelayStore(context)
+    val speechKey = VaultSpeechKeyStore(context)
+    val appearance = PrefsAppearanceStore(context)
     val transcriber = ScribeTranscriber()
     private val notion = LeafNotion()
     private val oauth = if (NotionOAuthConfig.enabled) HttpNotionOAuthRelay() else null

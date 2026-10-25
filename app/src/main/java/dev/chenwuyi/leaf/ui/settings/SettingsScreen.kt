@@ -24,7 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Login
 import androidx.compose.material.icons.rounded.BugReport
-import androidx.compose.material.icons.rounded.CloudSync
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.LinkOff
@@ -45,6 +46,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -58,12 +62,15 @@ import dev.chenwuyi.leaf.BuildConfig
 import dev.chenwuyi.leaf.CrashLog
 import dev.chenwuyi.leaf.data.notion.NotionCredential
 import dev.chenwuyi.leaf.data.settings.Connection
+import dev.chenwuyi.leaf.data.settings.ReadingFont
+import dev.chenwuyi.leaf.data.settings.ThemeMode
 import dev.chenwuyi.leaf.data.sync.SyncStatus
+import dev.chenwuyi.leaf.ui.theme.GoogleSansFlex
 
 /**
  * A quiet tool page laid out like Sheaf's settings: back in a bar, 设置 set large at the top (the bar
  * takes the title over once it scrolls away), then labelled groups of segmented rows, each row's value
- * at its end. Notion, 按住说 and 关于.
+ * at its end. Notion, 外观, 按住说 and 关于.
  */
 @Composable
 fun SettingsScreen(vm: SettingsViewModel, onClose: () -> Unit, modifier: Modifier = Modifier) {
@@ -72,7 +79,9 @@ fun SettingsScreen(vm: SettingsViewModel, onClose: () -> Unit, modifier: Modifie
     val step by vm.step.collectAsStateWithLifecycle()
     val scroll = rememberScrollState()
     val handoff = with(LocalDensity.current) { 12.dp.toPx() to 36.dp.toPx() }
-    Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
+    // The page lies over home rather than replacing it; without a pointer handler of its own, a tap on
+    // anything that is not a control (the bar's empty middle) fell through to home's search bar below.
+    Column(modifier.fillMaxSize().pointerInput(Unit) {}.background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.padding(horizontal = 8.dp).column(bleed = 8.dp).padding(end = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
             Spacer(Modifier.width(4.dp))
@@ -92,6 +101,7 @@ fun SettingsScreen(vm: SettingsViewModel, onClose: () -> Unit, modifier: Modifie
             Column(Modifier.column()) {
                 Text("设置", style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp).semantics { heading() })
                 NotionGroup(vm, connection, status, step)
+                AppearanceGroup(vm)
                 VoiceGroup(vm)
                 AboutGroup()
             }
@@ -168,25 +178,42 @@ private fun NotionGroup(vm: SettingsViewModel, connection: Connection?, status: 
 }
 
 @Composable
+private fun AppearanceGroup(vm: SettingsViewModel) {
+    val appearance by vm.appearance.collectAsStateWithLifecycle()
+    SettingsSection("外观") {
+        ChoiceRow(
+            Icons.Rounded.TextFields, "正文字体", ReadingFont.entries, appearance.font, { it.label },
+            onPick = { vm.setAppearance(appearance.copy(font = it)) },
+            // Each choice is set in the face it picks.
+            face = { font -> MaterialTheme.typography.labelLarge.merge(TextStyle(fontFamily = if (font == ReadingFont.Sans) GoogleSansFlex else FontFamily.Serif)) },
+        )
+        ChoiceRow(Icons.Rounded.DarkMode, "深浅色", ThemeMode.entries, appearance.theme, { it.label }, onPick = { vm.setAppearance(appearance.copy(theme = it)) })
+    }
+}
+
+@Composable
 private fun VoiceGroup(vm: SettingsViewModel) {
-    val host by vm.relayHost.collectAsStateWithLifecycle()
-    val error by vm.relayError.collectAsStateWithLifecycle()
+    val masked by vm.speechKeyMasked.collectAsStateWithLifecycle()
+    val error by vm.speechKeyError.collectAsStateWithLifecycle()
     var text by rememberSaveable { mutableStateOf("") }
-    val saved = host
+    val saved = masked
     SettingsSection("按住说") {
-        SettingsRow(Icons.Rounded.Mic, "转写", value = if (saved != null) "ElevenLabs · 经 Relay" else "本机识别")
+        SettingsRow(Icons.Rounded.Mic, "转写", value = if (saved != null) "ElevenLabs" else "本机识别")
         if (saved != null) {
-            SettingsRow(Icons.Rounded.CloudSync, "Relay", value = saved)
-            ActionRow(Icons.Rounded.LinkOff, "不用 Relay", titleColor = MaterialTheme.colorScheme.error, onClick = vm::clearRelay)
+            SettingsRow(Icons.Rounded.Key, "ElevenLabs 密钥", value = saved)
+            ActionRow(Icons.Rounded.LinkOff, "移除密钥", titleColor = MaterialTheme.colorScheme.error, onClick = vm::clearSpeechKey)
         } else {
-            PanelBlock("Sheaf「接力」里的连接串") {
-                SecretField(text, { text = it }, "https://…/#token=…")
-                Button(onClick = { vm.saveRelay(text) { text = "" } }, enabled = text.isNotBlank()) { Text("保存") }
+            PanelBlock("ElevenLabs 密钥") {
+                SecretField(text, { text = it }, "sk_…")
+                Button(onClick = { vm.saveSpeechKey(text) { text = "" } }, enabled = text.isNotBlank()) { Text("保存") }
             }
         }
     }
     error?.let { SettingsHint(it, MaterialTheme.colorScheme.error) }
-    SettingsHint(if (saved != null) "断网时改用这台设备的系统识别。" else "贴上连接串后改用 ElevenLabs 转写，中英混说更准。")
+    SettingsHint(
+        if (saved != null) "按住说直接用 Scribe v2 转写；断网时改用这台设备的系统识别。"
+        else "填上 ElevenLabs 的 API 密钥后改用 Scribe v2 转写，中英混说更准。密钥只存在这台设备的加密存储里。",
+    )
 }
 
 @Composable
