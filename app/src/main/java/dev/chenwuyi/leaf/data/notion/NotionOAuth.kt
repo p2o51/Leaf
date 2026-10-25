@@ -107,6 +107,8 @@ class HttpNotionOAuthRelay(
             throw NotionException(NotionFailure.Unavailable)
         }
         response.use {
+            // A throttle is not a bad credential: keep the pair and let sync retry later.
+            if (it.code == 429) throw NotionException(NotionFailure.RateLimited, it.code)
             // Notion answers a spent or revoked code / refresh token with 400 invalid_grant: sign in again.
             if (it.code in 400..499) throw NotionException(NotionFailure.Unauthorized, it.code)
             if (!it.isSuccessful) throw NotionException(NotionFailure.Unavailable, it.code)

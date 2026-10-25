@@ -20,8 +20,11 @@ interface ConnectionStore {
     /** Null when there is none, or when it can no longer be read (restored backup, broken key). */
     fun credential(): NotionCredential?
     fun save(connection: Connection, credential: NotionCredential)
-    /** A refresh rotated the OAuth pair: keep the connection, swap what the vault holds. */
-    fun replaceCredential(credential: NotionCredential)
+    /**
+     * A refresh rotated the OAuth pair: swap what the vault holds, but only while it still holds [stale].
+     * A disconnect or a new sign-in during the refresh wins; false then, and nothing is written.
+     */
+    fun replaceCredential(stale: NotionCredential, fresh: NotionCredential): Boolean
     fun clear()
 
     fun token(): String? = credential()?.accessToken
@@ -35,8 +38,14 @@ class PrefsConnectionStore(context: Context, private val vault: KeystoreTokenVau
 
     override fun credential(): NotionCredential? = runCatching { vault.read(ACCOUNT)?.let(NotionCredential::decode) }.getOrNull()
 
-    override fun replaceCredential(credential: NotionCredential) = vault.write(ACCOUNT, credential.encode())
+    @Synchronized
+    override fun replaceCredential(stale: NotionCredential, fresh: NotionCredential): Boolean {
+        if (state.value == null || credential() != stale) return false
+        vault.write(ACCOUNT, fresh.encode())
+        return true
+    }
 
+    @Synchronized
     override fun save(connection: Connection, credential: NotionCredential) {
         vault.write(ACCOUNT, credential.encode())
         prefs.edit()
@@ -49,6 +58,7 @@ class PrefsConnectionStore(context: Context, private val vault: KeystoreTokenVau
         state.value = connection
     }
 
+    @Synchronized
     override fun clear() {
         vault.delete(ACCOUNT)
         prefs.edit().clear().apply()
@@ -78,7 +88,12 @@ class MemoryConnectionStore(initial: Connection? = null, private var secret: Not
     private val state = MutableStateFlow(initial)
     override val connection: StateFlow<Connection?> = state.asStateFlow()
     override fun credential(): NotionCredential? = secret
-    override fun save(connection: Connection, credential: NotionCredential) { secret = credential; state.value = connection }
-    override fun replaceCredential(credential: NotionCredential) { secret = credential }
-    override fun clear() { secret = null; state.value = null }
+    @Synchronized
+    override fun replaceCredential(stale: NotionCredential, fresh: NotionCredential): Boolean {
+        if (state.value == null || secret != stale) return false
+        secret = fresh
+        return true
+    }
+    @Synchronized override fun save(connection: Connection, credential: NotionCredential) { secret = credential; state.value = connection }
+    @Synchronized override fun clear() { secret = null; state.value = null }
 }

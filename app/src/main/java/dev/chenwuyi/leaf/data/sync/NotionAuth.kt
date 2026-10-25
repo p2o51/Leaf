@@ -32,7 +32,9 @@ class NotionAuth(private val store: ConnectionStore, private val relay: NotionOA
             if (failure.reason == NotionFailure.Unauthorized) return@withLock null
             throw failure
         }
-        withContext(Dispatchers.IO) { store.replaceCredential(NotionCredential.OAuth(tokens.accessToken, tokens.refreshToken)) }
+        val fresh = NotionCredential.OAuth(tokens.accessToken, tokens.refreshToken)
+        // Disconnected or signed in again meanwhile: the new pair belongs to nothing current, so this run stops.
+        if (!withContext(Dispatchers.IO) { store.replaceCredential(oauth, fresh) }) return@withLock null
         tokens.accessToken
     }
 

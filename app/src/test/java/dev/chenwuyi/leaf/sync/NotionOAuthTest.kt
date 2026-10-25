@@ -95,6 +95,7 @@ class NotionOAuthTest {
         MockWebServer().use { relayServer ->
             relayServer.enqueue(MockResponse().setBody("""{"access_token":"a","refresh_token":"r","bot_id":"bot"}"""))
             relayServer.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":"invalid_grant"}"""))
+            relayServer.enqueue(MockResponse().setResponseCode(429).setBody("""{"error":"rate_limited"}"""))
             val http = HttpNotionOAuthRelay(baseUrl = relayServer.url("/"))
             assertEquals(NotionOAuthTokens("a", "r"), http.exchange("test-code"))
             val sent = relayServer.takeRequest()
@@ -104,6 +105,10 @@ class NotionOAuthTest {
             val failure = runCatching { http.refresh("spent") }.exceptionOrNull()
             assertEquals(NotionFailure.Unauthorized, (failure as NotionException).reason)
             assertEquals("/leaf/refresh", relayServer.takeRequest().path)
+
+            // A throttle keeps the pair: sync waits and retries instead of asking to reconnect.
+            val throttled = runCatching { http.refresh("still-good") }.exceptionOrNull()
+            assertEquals(NotionFailure.RateLimited, (throttled as NotionException).reason)
         }
     }
 
@@ -162,6 +167,16 @@ class NotionOAuthTest {
         fake.validToken = "access-2"
         assertEquals(RunResult.Stopped, engine.run())
         assertEquals(NotionCredential.OAuth("access-1", "refresh-1"), store.credential())
+    }
+
+    @Test
+    fun should_not_bring_the_old_pair_back_when_disconnected_during_a_refresh() = runBlocking {
+        val store = MemoryConnectionStore(connection, NotionCredential.OAuth("access-1", "refresh-1"))
+        val slow = object : NotionOAuthRelay by relay {
+            override suspend fun refresh(refreshToken: String): NotionOAuthTokens { store.clear(); return relay.refresh(refreshToken) }
+        }
+        assertNull(NotionAuth(store, slow).refreshed("access-1"))
+        assertNull(store.credential())
     }
 
     private class Relay : NotionOAuthRelay {
