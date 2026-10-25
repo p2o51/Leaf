@@ -238,4 +238,70 @@ class SyncEngineTest {
         assertEquals("x2", sent[1].id)
         assertEquals(sent[0].id, db.dao().blocksOf("e1").first { it.id == "k1" }.blockId)
     }
+
+    @Test
+    fun should_write_the_block_again_after_its_new_neighbour_when_a_block_is_moved() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(
+            EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "一", "default"),
+            EssayBlockEntity("k2", "e1", 1, "x2", "paragraph", "二", "default"),
+            EssayBlockEntity("k3", "e1", 2, "x3", "paragraph", "三", "default"),
+        ))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "一"), fake.paragraph("x2", "二"), fake.paragraph("x3", "三"))
+        repo.moveBlock("e1", "k1", 2)
+        engine.run(pull = false)
+
+        val sent = fake.children.getValue("p1")
+        assertEquals(listOf("x2", "x3"), sent.take(2).map { it.id })
+        assertEquals(3, sent.size)
+        val local = db.dao().blocksOf("e1")
+        assertEquals(listOf("k2", "k3", "k1"), local.map { it.id })
+        assertEquals(sent[2].id, local.last().blockId)
+        assertTrue(fake.log.any { it.startsWith("DELETE blocks/x1") })
+    }
+
+    @Test
+    fun should_upload_a_picked_cover_and_clear_a_removed_one() = runBlocking {
+        val withPhotos = SyncEngine(db.dao(), LeafNotion(NotionClient(baseUrl = "http://127.0.0.1:${server.port}/v1/".toHttpUrl(), requestIntervalMillis = 0)), store,
+            readPhoto = { byteArrayOf(1, 2, 3) })
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        repo.setCover("e1", dev.chenwuyi.leaf.data.Picture.Local("file:///cover.jpg"))
+        assertEquals(dev.chenwuyi.leaf.data.Picture.Local("file:///cover.jpg"), repo.essays.first().single().cover)
+        withPhotos.run(pull = false)
+        assertTrue(fake.log.any { it.startsWith("PATCH pages/p1") && it.contains("file_upload") })
+
+        repo.setCover("e1", null)
+        withPhotos.run(pull = false)
+        assertTrue(fake.log.last { it.startsWith("PATCH pages/p1") }.contains("\"cover\":null"))
+    }
+
+    @Test
+    fun should_trash_the_page_and_not_pull_it_back_when_an_essay_is_deleted() = runBlocking {
+        fake.rows += fake.row("p1", "东京第三天", "随笔")
+        engine.run()
+        val essay = repo.essays.first().single()
+        repo.deleteEssay(essay.id)
+        engine.pull("ntn_test", store.connection.value!!)
+        assertTrue(repo.essays.first().isEmpty())
+        engine.run(pull = false)
+        assertTrue(fake.log.any { it.startsWith("PATCH pages/p1") && it.contains("in_trash") })
+    }
+
+    @Test
+    fun should_send_a_divider_when_one_is_inserted() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default")))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上"))
+        val essay = repo.essays.first().single()
+        repo.updateEssay(essay.copy(blocks = essay.blocks + EssayBlock.Other("d", EssayBlock.Divider) + EssayBlock.Paragraph("k2", "晚上")))
+        engine.run(pull = false)
+        assertEquals(listOf("paragraph", "divider", "paragraph"), fake.children.getValue("p1").map { it.json.getString("type") })
+    }
+
+    @Test
+    fun should_keep_the_day_an_essay_was_created_when_pulling() = runBlocking {
+        fake.rows += fake.row("p1", "东京第三天", "随笔").put("created_time", "2026-10-20T08:00:00.000Z")
+        engine.run()
+        assertEquals(java.time.Instant.parse("2026-10-20T08:00:00Z"), repo.essays.first().single().createdAt)
+    }
 }

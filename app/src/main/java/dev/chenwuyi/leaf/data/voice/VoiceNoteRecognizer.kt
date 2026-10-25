@@ -30,7 +30,7 @@ enum class VoiceRoute {
      */
     System,
 
-    /** ElevenLabs Scribe, directly or through the Relay: the recording leaves the device (ScribeVoiceRecognizer). */
+    /** ElevenLabs Scribe: the recording leaves the device (ScribeVoiceRecognizer). */
     Cloud,
 
     /** No usable recognizer, or only a networked one while that is not allowed. */
@@ -50,6 +50,9 @@ class VoiceException(message: String, val kind: Kind) : IOException(message) {
 
         /** The recognizer is still busy (with an earlier segment or another app), or rate limited. */
         Busy,
+
+        /** The speech service refused the saved key (wrong, revoked or out of quota). */
+        Unauthorized,
 
         /** Anything else the recognizer reports (audio error, client error, a dead service). */
         Failed,

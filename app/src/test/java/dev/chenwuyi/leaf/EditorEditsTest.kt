@@ -9,7 +9,9 @@ import dev.chenwuyi.leaf.ui.essay.EditorEdits
 import dev.chenwuyi.leaf.ui.essay.InsertKind
 import java.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EditorEditsTest {
@@ -81,5 +83,32 @@ class EditorEditsTest {
         val styled = EditorEdits.recolor(EditorEdits.restyle(e, "c", "heading_1"), "c", NotionColor.Blue)
         assertEquals(EssayBlock.Paragraph("c", "中间", "heading_1", NotionColor.Blue), styled.blocks[2])
         assertEquals(1, EditorEdits.numberOf(styled, "d"))
+    }
+
+    @Test
+    fun should_put_a_block_back_at_the_new_index_when_moving() {
+        val blocks = listOf(EssayBlock.Paragraph("a", "1"), EssayBlock.Paragraph("b", "2"), EssayBlock.Paragraph("c", "3"))
+        assertEquals(listOf("b", "c", "a"), dev.chenwuyi.leaf.data.BlockOrder.move(blocks, "a", 2).map { it.id })
+        assertEquals(listOf("c", "a", "b"), dev.chenwuyi.leaf.data.BlockOrder.move(blocks, "c", 0).map { it.id })
+        assertEquals(listOf("a", "b", "c"), dev.chenwuyi.leaf.data.BlockOrder.move(blocks, "x", 0).map { it.id })
+        assertEquals(listOf("b", "c", "a"), dev.chenwuyi.leaf.data.BlockOrder.move(blocks, "a", 9).map { it.id })
+    }
+
+    @Test
+    fun should_only_let_blocks_leaf_can_write_again_move_when_dragging() {
+        assertTrue(dev.chenwuyi.leaf.data.BlockOrder.movable(EssayBlock.Paragraph("a", "1")))
+        assertTrue(dev.chenwuyi.leaf.data.BlockOrder.movable(EssayBlock.Other("d", EssayBlock.Divider)))
+        assertFalse(dev.chenwuyi.leaf.data.BlockOrder.movable(EssayBlock.Other("t", "table")))
+    }
+
+    @Test
+    fun should_list_non_empty_headings_in_order_when_building_the_outline() {
+        val e = essay(
+            EssayBlock.Paragraph("h1", "早上", "heading_1"),
+            EssayBlock.Paragraph("p", "正文"),
+            EssayBlock.Paragraph("h2", "", "heading_2"),
+            EssayBlock.Paragraph("h3", "晚上", "heading_3"),
+        )
+        assertEquals(listOf("h1", "h3"), EditorEdits.headings(e).map { it.id })
     }
 }

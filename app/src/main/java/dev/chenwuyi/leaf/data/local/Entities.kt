@@ -39,6 +39,8 @@ data class EssayEntity(
     /** The 标签 multi-select, one tag per line (a tag never contains a newline). */
     @ColumnInfo(defaultValue = "''")
     val tags: String = "",
+    /** Notion's created_time, epoch millis; null until a pull fills it in. */
+    val createdAt: Long? = null,
 )
 
 /**
@@ -75,4 +77,8 @@ object OutboxOp {
     const val SaveBlock = "save_block"
     /** Removes an essay block from Notion; [OutboxEntity.targetId] is the Notion block ID. */
     const val DeleteBlock = "delete_block"
+    /** Sets or clears an essay's cover from its row's coverUrl (file:// uploads, null clears). Target: the essay's local ID. */
+    const val SaveCover = "save_cover"
+    /** Moves an essay page to Notion's trash; [OutboxEntity.targetId] is the Notion page ID. */
+    const val DeleteEssay = "delete_essay"
 }

@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ScribbleEntity::class, EssayEntity::class, EssayBlockEntity::class, OutboxEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class LeafDatabase : RoomDatabase() {
@@ -18,7 +18,7 @@ abstract class LeafDatabase : RoomDatabase() {
     companion object {
         fun open(context: Context): LeafDatabase =
             Room.databaseBuilder(context.applicationContext, LeafDatabase::class.java, "leaf.db")
-                .addMigrations(Migration1To2, Migration2To3)
+                .addMigrations(Migration1To2, Migration2To3, Migration3To4)
                 .build()
 
         /** 2: image blocks in essays keep their picture. */
@@ -32,6 +32,13 @@ abstract class LeafDatabase : RoomDatabase() {
         val Migration2To3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE essays ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        /** 4: essays keep the day they were written, for the page's date line. */
+        val Migration3To4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE essays ADD COLUMN createdAt INTEGER")
             }
         }
     }

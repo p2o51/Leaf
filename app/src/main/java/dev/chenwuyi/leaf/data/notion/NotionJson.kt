@@ -24,6 +24,7 @@ data class RemoteRow(
     val coverUrl: String?,
     val editedAt: Instant,
     val tags: List<String> = emptyList(),
+    val createdAt: Instant? = null,
 )
 
 /** An essay body block. [type] is Notion's block type; only text-bearing types are editable in Leaf. */
@@ -92,6 +93,7 @@ object NotionJson {
             coverUrl = fileUrl(json.optJSONObject("cover")),
             editedAt = Instant.parse(json.getString("last_edited_time")),
             tags = tags(props),
+            createdAt = json.optString("created_time").takeIf { it.isNotBlank() }?.let { runCatching { Instant.parse(it) }.getOrNull() },
         )
     }
 
@@ -177,6 +179,12 @@ object NotionJson {
         if (type == "to_do") value.put("checked", false)
         return JSONObject().put("object", "block").put("type", type).put(type, value)
     }
+
+    fun divider(): JSONObject = JSONObject().put("object", "block").put("type", "divider").put("divider", JSONObject())
+
+    /** PATCH body for a page's cover: an uploaded file, or none. */
+    fun cover(uploadId: String?): JSONObject =
+        JSONObject().put("cover", if (uploadId == null) JSONObject.NULL else JSONObject().put("type", "file_upload").put("file_upload", JSONObject().put("id", uploadId)))
 
     fun image(uploadId: String, caption: String): JSONObject =
         JSONObject().put("object", "block").put("type", "image").put("image", JSONObject()

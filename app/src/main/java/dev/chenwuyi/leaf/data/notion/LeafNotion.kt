@@ -51,6 +51,20 @@ class LeafNotion(private val client: NotionClient = NotionClient()) {
         client.patch(token, "pages/$pageId", NotionJson.essayProperties(titleProperty, title, color, pinned))
     }
 
+    /** Sets a page's cover to an uploaded image, or clears it when [uploadId] is null. */
+    suspend fun setCover(token: String, pageId: String, uploadId: String?) {
+        client.patch(token, "pages/$pageId", NotionJson.cover(uploadId))
+    }
+
+    /** Moves a page to Notion's trash, where it can still be restored for 30 days. */
+    suspend fun trashPage(token: String, pageId: String) {
+        try {
+            client.patch(token, "pages/$pageId", JSONObject().put("in_trash", true))
+        } catch (gone: NotionException) {
+            if (gone.reason != NotionFailure.NotFound) throw gone
+        }
+    }
+
     /** Top-level children of a page; Leaf does not descend into nested blocks. */
     suspend fun children(token: String, blockId: String, limit: Int? = null): List<JSONObject> {
         if (limit != null) {

@@ -39,11 +39,13 @@ fun EssayEntity.toEssay(blocks: List<EssayBlockEntity>): Essay = Essay(
     title = title,
     blocks = blocks.sortedBy { it.position }.map { it.toBlock() },
     color = NotionColor.fromApi(color),
-    cover = coverUrl?.let(Picture::Remote) ?: sampleCover?.let(::sampleArt)?.let(Picture::Sample),
+    // A cover picked in Leaf is a local copy (file://) until a pull brings Notion's URL back.
+    cover = coverUrl?.let { if (it.startsWith("file:")) Picture.Local(it) else Picture.Remote(it) } ?: sampleCover?.let(::sampleArt)?.let(Picture::Sample),
     pinned = pinned,
     editedAt = Instant.ofEpochMilli(editedAt),
     storedPreview = preview,
     tags = tagList(tags),
+    createdAt = createdAt?.let(Instant::ofEpochMilli),
 )
 
 fun tagList(stored: String): List<String> = stored.split('\n').filter { it.isNotBlank() }

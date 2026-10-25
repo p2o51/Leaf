@@ -8,8 +8,7 @@ import android.media.MediaRecorder
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import dev.chenwuyi.leaf.LeafApplication
-import dev.chenwuyi.leaf.data.settings.RelayConnection
-import dev.chenwuyi.leaf.data.settings.RelayStore
+import dev.chenwuyi.leaf.data.settings.SpeechKeyStore
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -73,16 +72,16 @@ class AudioRecordPcmRecorder(private val io: CoroutineDispatcher = Dispatchers.I
     companion object {
         const val SampleRate = 16_000
 
-        /** Five minutes, the most the Relay takes (MAX_TRANSCRIBE_BODY_BYTES in server/src/speech.ts). */
+        /** Five minutes: a hold longer than that is a slip, and the upload stays a few megabytes. */
         const val MaxBytes = SampleRate * 2 * 300
     }
 }
 
 /**
- * ElevenLabs Scribe v2 through Sheaf's Relay, which adds the Worker's key and the saved keyterms. No
- * language is sent: Scribe detects it, mixed Chinese and English included.
+ * ElevenLabs Scribe v2, called from the phone with the key saved in 设置. No language is sent: Scribe
+ * detects it, mixed Chinese and English included. [baseUrl] is ElevenLabs' API; tests point it at a mock.
  */
-class ScribeTranscriber(client: OkHttpClient = OkHttpClient()) {
+class ScribeTranscriber(client: OkHttpClient = OkHttpClient(), private val baseUrl: String = "https://api.elevenlabs.io") {
     private val http = client.newBuilder()
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
@@ -90,9 +89,9 @@ class ScribeTranscriber(client: OkHttpClient = OkHttpClient()) {
         .followSslRedirects(false)
         .build()
 
-    suspend fun transcribe(pcm: ByteArray, relay: RelayConnection): String {
-        val url = "${relay.baseUrl}/v1/speech/elevenlabs/v1/speech-to-text".toHttpUrlOrNull()
-            ?: throw VoiceException("bad relay address", VoiceException.Kind.Unavailable)
+    suspend fun transcribe(pcm: ByteArray, key: String): String {
+        val url = "$baseUrl/v1/speech-to-text".toHttpUrlOrNull()
+            ?: throw VoiceException("bad speech-to-text address", VoiceException.Kind.Unavailable)
         val form = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("model_id", Model)
             // Raw PCM skips decoding on their side, which ElevenLabs says answers sooner than a file.
@@ -101,7 +100,7 @@ class ScribeTranscriber(client: OkHttpClient = OkHttpClient()) {
             .addFormDataPart("file", "scribble.pcm", pcm.toRequestBody(OctetStream))
             .build()
         val request = Request.Builder().url(url).post(form)
-            .header("Authorization", "Bearer ${relay.token}")
+            .header("xi-api-key", key)
             .header("Accept", "application/json")
             .build()
         val (code, raw) = execute(request)
@@ -134,9 +133,10 @@ class ScribeTranscriber(client: OkHttpClient = OkHttpClient()) {
         const val Model = "scribe_v2"
         private val OctetStream = "application/octet-stream".toMediaType()
 
-        // A rate limit or a gateway timeout is a wait; anything else the next hold would meet too.
+        // A rate limit or a gateway timeout is a wait; a refused key needs 设置; anything else the next hold would meet too.
         internal fun kindOf(code: Int): VoiceException.Kind = when (code) {
-            429, 502, 504 -> VoiceException.Kind.Busy
+            429, 502, 503, 504 -> VoiceException.Kind.Busy
+            401, 403 -> VoiceException.Kind.Unauthorized
             else -> VoiceException.Kind.Failed
         }
     }
@@ -147,18 +147,18 @@ class ScribeTranscriber(client: OkHttpClient = OkHttpClient()) {
  * (Scribe answers once, in about a second), so the take is one [VoiceEvent.Final].
  */
 class ScribeVoiceRecognizer(
-    private val relay: RelayStore,
+    private val key: SpeechKeyStore,
     private val transcriber: ScribeTranscriber,
     private val recorder: PcmRecorder = AudioRecordPcmRecorder(),
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : VoiceNoteRecognizer {
-    val ready: Boolean get() = relay.host.value != null
+    val ready: Boolean get() = key.masked.value != null
 
     override fun route(): VoiceRoute = if (ready) VoiceRoute.Cloud else VoiceRoute.None
 
     override fun listen(languageTag: String, release: Deferred<Unit>): Flow<VoiceEvent> = flow {
-        // The Keystore is on disk, so the connection is read off the main thread.
-        val connection = withContext(io) { relay.read() } ?: throw VoiceException("no relay", VoiceException.Kind.Unavailable)
+        // The Keystore is on disk, so the key is read off the main thread.
+        val apiKey = withContext(io) { key.read() } ?: throw VoiceException("no ElevenLabs key", VoiceException.Kind.Unavailable)
         emit(VoiceEvent.Listening)
         val pcm = recorder.record(release)
         currentCoroutineContext().ensureActive()
@@ -167,7 +167,7 @@ class ScribeVoiceRecognizer(
             emit(VoiceEvent.Final(""))
             return@flow
         }
-        emit(VoiceEvent.Final(transcriber.transcribe(pcm, connection)))
+        emit(VoiceEvent.Final(transcriber.transcribe(pcm, apiKey)))
     }
 
     companion object {
@@ -192,7 +192,7 @@ class SystemNetworkStatus(context: Context) : NetworkStatus {
 }
 
 /**
- * Scribe when a Relay is saved and the device is online, else the system recognizer. Chosen at each
+ * Scribe when an ElevenLabs key is saved and the device is online, else the system recognizer. Chosen at each
  * hold, so the permission line ([route]) and the take always agree. Offline the system one still works
  * on the device; Scribe would only lose the recording.
  */
@@ -210,10 +210,10 @@ class CloudFirstVoiceRecognizer(
 }
 
 object VoiceRecognizers {
-    /** Scribe through the Relay when one is saved, else the system recognizer; just the latter without the app's container (tests). */
+    /** Scribe when an ElevenLabs key is saved, else the system recognizer; just the latter without the app's container (tests). */
     fun forScribbles(context: Context): VoiceNoteRecognizer {
         val system = SystemVoiceNoteRecognizer(context)
         val container = (context.applicationContext as? LeafApplication)?.container ?: return system
-        return CloudFirstVoiceRecognizer(ScribeVoiceRecognizer(container.relay, container.transcriber), system, SystemNetworkStatus(context))
+        return CloudFirstVoiceRecognizer(ScribeVoiceRecognizer(container.speechKey, container.transcriber), system, SystemNetworkStatus(context))
     }
 }

@@ -28,6 +28,15 @@ interface LeafRepository {
     suspend fun loadEssayBody(essayId: String) {}
 
     suspend fun removeBlocks(essayId: String, blockIds: Set<String>)
+
+    /** Moves one block to [toIndex] of the essay's blocks (drag to reorder). */
+    suspend fun moveBlock(essayId: String, blockId: String, toIndex: Int)
+
+    /** Sets the essay's cover to a picked photo, or removes it when null. */
+    suspend fun setCover(essayId: String, cover: Picture?)
+
+    /** Removes the essay; in Notion its page goes to the trash. */
+    suspend fun deleteEssay(essayId: String)
 }
 
 class InMemoryLeafRepository(
@@ -62,9 +71,21 @@ class InMemoryLeafRepository(
     }
 
     override suspend fun newEssay(): Essay {
-        val e = Essay(newId(), "", listOf(EssayBlock.Paragraph(newId(), "")), NotionColor.Default, null, false, clock())
+        val e = Essay(newId(), "", listOf(EssayBlock.Paragraph(newId(), "")), NotionColor.Default, null, false, clock(), createdAt = clock())
         essayState.update { it + e }
         return e
+    }
+
+    override suspend fun moveBlock(essayId: String, blockId: String, toIndex: Int) {
+        essayState.update { list -> list.map { e -> if (e.id == essayId) e.copy(blocks = BlockOrder.move(e.blocks, blockId, toIndex)) else e } }
+    }
+
+    override suspend fun setCover(essayId: String, cover: Picture?) {
+        essayState.update { list -> list.map { if (it.id == essayId) it.copy(cover = cover) else it } }
+    }
+
+    override suspend fun deleteEssay(essayId: String) {
+        essayState.update { list -> list.filterNot { it.id == essayId } }
     }
 
     override suspend fun updateEssay(essay: Essay) {
@@ -81,5 +102,31 @@ class InMemoryLeafRepository(
         val result = WallRules.copyInto(target, picked, clock(), newId)
         essayState.update { list -> if (target == null) list + result else list.map { if (it.id == result.id) result else it } }
         return result.id
+    }
+}
+
+/** Reordering, kept pure so the editor's live drag and the stored order agree. */
+object BlockOrder {
+    /** [items] with the block [id] taken out and put back at [toIndex] (clamped). */
+    fun move(items: List<EssayBlock>, id: String, toIndex: Int): List<EssayBlock> = moveAt(items, items.indexOfFirst { it.id == id }, toIndex)
+
+    /** [items] with the one at [from] taken out and put back at [toIndex] (clamped); unchanged when [from] is out of range. */
+    fun <T> moveAt(items: List<T>, from: Int, toIndex: Int): List<T> {
+        if (from !in items.indices) return items
+        val out = items.toMutableList()
+        val moved = out.removeAt(from)
+        out.add(toIndex.coerceIn(0, out.size), moved)
+        return out
+    }
+
+    /**
+     * Whether a block can be dragged: Leaf can only move what it can write again in Notion, which has no
+     * move call, so a moved block is deleted and created anew. Tables, embeds and other blocks Leaf does
+     * not know stay where they are.
+     */
+    fun movable(block: EssayBlock): Boolean = when (block) {
+        is EssayBlock.Paragraph, is EssayBlock.Photo -> true
+        is EssayBlock.Other -> block.type == EssayBlock.Divider
+        is EssayBlock.SyncedScribble -> false
     }
 }

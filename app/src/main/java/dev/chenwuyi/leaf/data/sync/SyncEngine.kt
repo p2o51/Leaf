@@ -1,5 +1,6 @@
 package dev.chenwuyi.leaf.data.sync
 
+import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.local.EssayBlockEntity
 import dev.chenwuyi.leaf.data.local.EssayEntity
@@ -118,6 +119,11 @@ class SyncEngine(
             val row = dao.block(op.targetId)
             if (row == null) true else pushBlock(token, row).let { dao.block(row.id)?.let { it.text == row.text && it.color == row.color && it.type == row.type } ?: true }
         }
+        OutboxOp.SaveCover -> {
+            val row = dao.essay(op.targetId)
+            if (row == null) true else pushCover(token, row).let { dao.essay(row.id)?.coverUrl == row.coverUrl }
+        }
+        OutboxOp.DeleteEssay -> { notion.trashPage(token, op.targetId); true }
         else -> true
     }
 
@@ -153,12 +159,27 @@ class SyncEngine(
         notion.updateEssay(token, source(c), pageId, row.title, NotionColor.fromApi(row.color), row.pinned)
     }
 
+    /** A cover picked in Leaf goes up as a file upload; none clears Notion's. A Notion URL is already there. */
+    private suspend fun pushCover(token: String, row: EssayEntity) {
+        // The essay's own SaveEssay op is earlier in the queue, so it has a page by now.
+        val pageId = row.pageId ?: throw NotionException(NotionFailure.InvalidInput)
+        val cover = row.coverUrl
+        when {
+            cover == null -> notion.setCover(token, pageId, null)
+            cover.startsWith("file:") -> {
+                val bytes = readPhoto(cover) ?: return
+                notion.setCover(token, pageId, notion.uploadImage(token, "leaf-cover-${row.id}.jpg", "image/jpeg", bytes))
+            }
+        }
+    }
+
     private suspend fun pushBlock(token: String, row: EssayBlockEntity) {
         val essay = dao.essay(row.essayId) ?: return
         // The essay's own SaveEssay op is always earlier in the queue, so it has a page by now.
         val pageId = essay.pageId ?: throw NotionException(NotionFailure.InvalidInput)
         val isImage = row.type == "image"
-        if (row.type !in NotionJson.TEXT_TYPES && !isImage) return
+        val isDivider = row.type == EssayBlock.Divider
+        if (row.type !in NotionJson.TEXT_TYPES && !isImage && !isDivider) return
         val color = NotionColor.fromApi(row.color)
         val blockId = row.blockId
         if (blockId == null) {
@@ -167,9 +188,13 @@ class SyncEngine(
             // Nothing synced before it but something after: it is the new first block (a restyled opening line).
             val atStart = after == null && siblings.any { it.position > row.position }
             val block = if (isImage) {
-                // Inserted in Leaf, so the photo is a local copy (PhotoStore); without it there is nothing to send.
-                val bytes = row.photo?.takeIf { it.startsWith("file:") }?.let(readPhoto) ?: return
+                // Inserted in Leaf, the photo is a local copy (PhotoStore). Moved by drag, it is Notion's own
+                // image, sent again as a new upload because Notion's file URLs expire.
+                val photo = row.photo ?: return
+                val bytes = (if (photo.startsWith("file:")) readPhoto(photo) else downloadPhoto(photo)) ?: return
                 NotionJson.image(notion.uploadImage(token, "leaf-${row.id}.jpg", "image/jpeg", bytes), row.text)
+            } else if (isDivider) {
+                NotionJson.divider()
             } else {
                 NotionJson.textBlock(row.type, row.text, color)
             }
@@ -180,7 +205,7 @@ class SyncEngine(
             dao.upsertBlocks(listOf(now.copy(blockId = created.first)))
         } else if (isImage) {
             notion.updateBlock(token, blockId, NotionJson.captionUpdate(row.text))
-        } else {
+        } else if (!isDivider) {
             notion.updateBlock(token, blockId, NotionJson.textUpdate(row.type, row.text, color))
         }
     }
@@ -220,6 +245,8 @@ class SyncEngine(
         val local = dao.allEssays().filter { !it.sample }
         val byPage = local.filter { it.pageId != null }.associateBy { it.pageId }
         for (r in rows) {
+            // Deleted in Leaf and not yet trashed in Notion: pulling it back would undo the delete.
+            if (r.pageId in waiting) continue
             val mine = byPage[r.pageId]
             if (mine != null && mine.id in waiting) continue
             val changed = mine == null || mine.editedAt != r.editedAt.toEpochMilli()
@@ -238,6 +265,7 @@ class SyncEngine(
                 preview = preview,
                 bodyLoaded = mine?.bodyLoaded == true && !changed,
                 tags = tagColumn(r.tags),
+                createdAt = r.createdAt?.toEpochMilli() ?: mine?.createdAt,
             )))
         }
         val remoteIds = rows.map { it.pageId }.toSet()
