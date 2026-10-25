@@ -16,6 +16,9 @@ class FakeNotion : Dispatcher() {
     val log = CopyOnWriteArrayList<String>()
     private var next = 1
 
+    /** Runs while an append is in flight, before Notion answers: for edits that race a push. */
+    var duringAppend: () -> Unit = {}
+
     fun paragraph(id: String, text: String, color: String = "default", created: String = "2026-10-20T01:00:00.000Z") = Block(id, JSONObject()
         .put("object", "block").put("id", id).put("type", "paragraph").put("created_time", created)
         .put("paragraph", JSONObject().put("color", color).put("rich_text", JSONArray().put(JSONObject().put("plain_text", text)))))
@@ -41,6 +44,7 @@ class FakeNotion : Dispatcher() {
             request.method == "GET" && parts[0] == "blocks" && parts.getOrNull(2) == "children" ->
                 ok(JSONObject().put("results", JSONArray(children[parts[1]].orEmpty().map { it.json })).put("has_more", false))
             request.method == "PATCH" && parts[0] == "blocks" && parts.getOrNull(2) == "children" -> {
+                duringAppend()
                 val list = children.getOrPut(parts[1]) { mutableListOf() }
                 val created = (0 until body!!.getJSONArray("children").length()).map { i ->
                     val json = body.getJSONArray("children").getJSONObject(i)
@@ -48,7 +52,8 @@ class FakeNotion : Dispatcher() {
                     Block(id, JSONObject(json.toString()).put("id", id).put("created_time", "2026-10-23T09:00:00.000Z"))
                 }
                 val after = body.optJSONObject("position")?.optJSONObject("after_block")?.optString("id")
-                val at = after?.let { a -> list.indexOfFirst { it.id == a } + 1 } ?: list.size
+                val atStart = body.optJSONObject("position")?.optString("type") == "start"
+                val at = after?.let { a -> list.indexOfFirst { it.id == a } + 1 } ?: if (atStart) 0 else list.size
                 list.addAll(at, created)
                 ok(JSONObject().put("results", JSONArray(created.map { it.json })))
             }

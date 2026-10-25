@@ -104,14 +104,14 @@ class SyncEngine(
             val row = dao.scribble(op.targetId)
             if (row == null) true else pushScribble(token, c, row).let { dao.scribble(row.id)?.sameContent(row) ?: true }
         }
-        OutboxOp.DeleteScribble -> { notion.deleteBlock(token, op.targetId); true }
+        OutboxOp.DeleteScribble, OutboxOp.DeleteBlock -> { notion.deleteBlock(token, op.targetId); true }
         OutboxOp.SaveEssay -> {
             val row = dao.essay(op.targetId)
             if (row == null) true else pushEssay(token, c, row).let { dao.essay(row.id)?.let { it.title == row.title && it.color == row.color && it.pinned == row.pinned } ?: true }
         }
         OutboxOp.SaveBlock -> {
             val row = dao.block(op.targetId)
-            if (row == null) true else pushBlock(token, row).let { dao.block(row.id)?.let { it.text == row.text && it.color == row.color } ?: true }
+            if (row == null) true else pushBlock(token, row).let { dao.block(row.id)?.let { it.text == row.text && it.color == row.color && it.type == row.type } ?: true }
         }
         else -> true
     }
@@ -132,7 +132,8 @@ class SyncEngine(
                 NotionJson.paragraph(row.text, color)
             }
             val created = notion.append(token, c.wallPageId, listOf(block)).firstOrNull() ?: return
-            dao.scribble(row.id)?.let { dao.upsertScribbles(listOf(it.copy(blockId = created.first))) }
+            val now = dao.scribble(row.id) ?: return notion.deleteBlock(token, created.first)
+            dao.upsertScribbles(listOf(now.copy(blockId = created.first)))
         } else if (isPhoto) {
             notion.updateBlock(token, blockId, NotionJson.captionUpdate(row.text))
         } else {
@@ -151,14 +152,29 @@ class SyncEngine(
         val essay = dao.essay(row.essayId) ?: return
         // The essay's own SaveEssay op is always earlier in the queue, so it has a page by now.
         val pageId = essay.pageId ?: throw NotionException(NotionFailure.InvalidInput)
-        if (row.type !in NotionJson.TEXT_TYPES) return
+        val isImage = row.type == "image"
+        if (row.type !in NotionJson.TEXT_TYPES && !isImage) return
         val color = NotionColor.fromApi(row.color)
         val blockId = row.blockId
         if (blockId == null) {
-            val after = dao.blocksOf(row.essayId).filter { it.position < row.position && it.blockId != null }.maxByOrNull { it.position }?.blockId
-            // Leaf only ever creates paragraphs; other text types arrive from Notion with a block ID.
-            val created = notion.append(token, pageId, listOf(NotionJson.paragraph(row.text, color)), after).firstOrNull() ?: return
-            dao.block(row.id)?.let { dao.upsertBlocks(listOf(it.copy(blockId = created.first))) }
+            val siblings = dao.blocksOf(row.essayId).filter { it.blockId != null && it.id != row.id }
+            val after = siblings.filter { it.position < row.position }.maxByOrNull { it.position }?.blockId
+            // Nothing synced before it but something after: it is the new first block (a restyled opening line).
+            val atStart = after == null && siblings.any { it.position > row.position }
+            val block = if (isImage) {
+                // Inserted in Leaf, so the photo is a local copy (PhotoStore); without it there is nothing to send.
+                val bytes = row.photo?.takeIf { it.startsWith("file:") }?.let(readPhoto) ?: return
+                NotionJson.image(notion.uploadImage(token, "leaf-${row.id}.jpg", "image/jpeg", bytes), row.text)
+            } else {
+                NotionJson.textBlock(row.type, row.text, color)
+            }
+            val created = notion.append(token, pageId, listOf(block), after, atStart).firstOrNull() ?: return
+            // Removed, or restyled into another type, while it was being created: the local row has no
+            // use for this block, so delete it here; a restyled row is sent again as its new type.
+            val now = dao.block(row.id)?.takeIf { it.type == row.type } ?: return notion.deleteBlock(token, created.first)
+            dao.upsertBlocks(listOf(now.copy(blockId = created.first)))
+        } else if (isImage) {
+            notion.updateBlock(token, blockId, NotionJson.captionUpdate(row.text))
         } else {
             notion.updateBlock(token, blockId, NotionJson.textUpdate(row.type, row.text, color))
         }
@@ -240,7 +256,7 @@ class SyncEngine(
         // Blocks already known keep their local ID, so an edit made from the old list still lands on them.
         val known = before.filter { it.blockId != null }.associate { it.blockId to it.id }
         val rows = blocks.mapIndexed { i, b ->
-            EssayBlockEntity(known[b.blockId] ?: newId(), essayId, i, b.blockId, b.type, b.text, b.color.apiName)
+            EssayBlockEntity(known[b.blockId] ?: newId(), essayId, i, b.blockId, b.type, b.text, b.color.apiName, photo = b.imageUrl)
         }
         // The editor writes without this mutex, so typing during the fetch must win over the fetched body.
         dao.replaceBodyIfUnchanged(essayId, before, rows)

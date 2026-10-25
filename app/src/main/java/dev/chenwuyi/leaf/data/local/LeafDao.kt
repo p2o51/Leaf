@@ -55,6 +55,9 @@ interface LeafDao {
     @Upsert
     suspend fun upsertBlocks(items: List<EssayBlockEntity>)
 
+    @Query("DELETE FROM essay_blocks WHERE id IN (:ids)")
+    suspend fun deleteBlocks(ids: Collection<String>)
+
     @Query("DELETE FROM essay_blocks WHERE essayId IN (:essayIds)")
     suspend fun deleteBlocksOf(essayIds: Collection<String>)
 

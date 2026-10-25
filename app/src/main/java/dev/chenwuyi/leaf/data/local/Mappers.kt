@@ -47,6 +47,7 @@ fun EssayEntity.toEssay(blocks: List<EssayBlockEntity>): Essay = Essay(
 
 fun EssayBlockEntity.toBlock(): EssayBlock = when {
     type == "scribble" && scribbleId != null -> EssayBlock.SyncedScribble(id, scribbleId)
+    type == "image" && photo != null -> EssayBlock.Photo(id, if (photo.startsWith("http")) Picture.Remote(photo) else Picture.Local(photo), text)
     type in NotionJson.TEXT_TYPES -> EssayBlock.Paragraph(id, text, type, NotionColor.fromApi(color))
     else -> EssayBlock.Other(id, type)
 }
@@ -55,6 +56,10 @@ fun EssayBlock.toEntity(essayId: String, position: Int, blockId: String?): Essay
     is EssayBlock.Paragraph -> EssayBlockEntity(id, essayId, position, blockId, type, text, color.apiName)
     is EssayBlock.SyncedScribble -> EssayBlockEntity(id, essayId, position, blockId, "scribble", "", NotionColor.Default.apiName, scribbleId)
     is EssayBlock.Other -> EssayBlockEntity(id, essayId, position, blockId, type, "", NotionColor.Default.apiName)
+    is EssayBlock.Photo -> EssayBlockEntity(
+        id, essayId, position, blockId, "image", caption, NotionColor.Default.apiName,
+        photo = (picture as? Picture.Local)?.uri ?: (picture as? Picture.Remote)?.url,
+    )
 }
 
 private fun sampleArt(name: String): SampleArt? = SampleArt.entries.firstOrNull { it.name == name }

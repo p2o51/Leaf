@@ -26,7 +26,7 @@ data class RemoteRow(
 )
 
 /** An essay body block. [type] is Notion's block type; only text-bearing types are editable in Leaf. */
-data class RemoteBlock(val blockId: String, val type: String, val text: String, val color: NotionColor) {
+data class RemoteBlock(val blockId: String, val type: String, val text: String, val color: NotionColor, val imageUrl: String? = null) {
     val editable: Boolean get() = type in NotionJson.TEXT_TYPES
 }
 
@@ -121,7 +121,8 @@ object NotionJson {
             "image" -> plain(value.optJSONArray("caption"))
             else -> ""
         }
-        return RemoteBlock(block.getString("id"), type, text, NotionColor.fromApi(value.optString("color")))
+        val image = if (type == "image") fileUrl(value) else null
+        return RemoteBlock(block.getString("id"), type, text, NotionColor.fromApi(value.optString("color")), image)
     }
 
     fun plain(array: JSONArray?): String {
@@ -147,9 +148,14 @@ object NotionJson {
         return out
     }
 
-    fun paragraph(text: String, color: NotionColor): JSONObject =
-        JSONObject().put("object", "block").put("type", "paragraph")
-            .put("paragraph", JSONObject().put("rich_text", richText(text)).put("color", color.backgroundApiName))
+    fun paragraph(text: String, color: NotionColor): JSONObject = textBlock("paragraph", text, color)
+
+    /** Any of [TEXT_TYPES] as a new block; a to-do starts unchecked. */
+    fun textBlock(type: String, text: String, color: NotionColor): JSONObject {
+        val value = JSONObject().put("rich_text", richText(text)).put("color", color.backgroundApiName)
+        if (type == "to_do") value.put("checked", false)
+        return JSONObject().put("object", "block").put("type", type).put(type, value)
+    }
 
     fun image(uploadId: String, caption: String): JSONObject =
         JSONObject().put("object", "block").put("type", "image").put("image", JSONObject()
@@ -165,11 +171,13 @@ object NotionJson {
 
     fun captionUpdate(caption: String): JSONObject = JSONObject().put("image", JSONObject().put("caption", richText(caption)))
 
-    fun children(blocks: List<JSONObject>, afterBlockId: String? = null): JSONObject {
+    fun children(blocks: List<JSONObject>, afterBlockId: String? = null, atStart: Boolean = false): JSONObject {
         val body = JSONObject().put("children", JSONArray(blocks))
         // 2026-03-11 replaced the top-level "after" with a position object; omitted means the end.
         if (afterBlockId != null) {
             body.put("position", JSONObject().put("type", "after_block").put("after_block", JSONObject().put("id", afterBlockId)))
+        } else if (atStart) {
+            body.put("position", JSONObject().put("type", "start"))
         }
         return body
     }

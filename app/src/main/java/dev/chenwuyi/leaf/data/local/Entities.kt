@@ -51,6 +51,8 @@ data class EssayBlockEntity(
     val text: String,
     val color: String,
     val scribbleId: String? = null,
+    /** Image blocks only: file:// for a photo still to upload, https:// for one already in Notion. */
+    val photo: String? = null,
 )
 
 /** One change waiting to reach Notion. Processed strictly in [seq] order so creations precede edits. */
@@ -67,4 +69,6 @@ object OutboxOp {
     const val DeleteScribble = "delete_scribble"
     const val SaveEssay = "save_essay"
     const val SaveBlock = "save_block"
+    /** Removes an essay block from Notion; [OutboxEntity.targetId] is the Notion block ID. */
+    const val DeleteBlock = "delete_block"
 }
