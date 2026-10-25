@@ -46,6 +46,7 @@ class SyncEngine(
     private val readPhoto: (String) -> ByteArray? = { null },
     private val downloadPhoto: suspend (String) -> ByteArray? = { null },
     private val newId: () -> String = { UUID.randomUUID().toString() },
+    private val auth: NotionAuth = NotionAuth(store, relay = null),
 ) {
     private val mutex = Mutex()
     private val statusState = MutableStateFlow<SyncStatus>(SyncStatus.Idle)
@@ -57,8 +58,11 @@ class SyncEngine(
         val token = store.token() ?: return@withLock stop("连接凭据不可用，请重新连接 Notion")
         statusState.value = SyncStatus.Running
         try {
-            push(token, connection)
-            if (pull) pull(token, connection)
+            // An OAuth token that expired mid-run is refreshed once; the outbox keeps whatever had not gone out.
+            auth.withToken(token) { current ->
+                push(current, connection)
+                if (pull) pull(current, connection)
+            }
             statusState.value = SyncStatus.Idle
             RunResult.Done
         } catch (failure: NotionException) {
@@ -254,7 +258,7 @@ class SyncEngine(
         val waiting = pending()
         if (essayId in waiting || dao.blocksOf(essayId).any { it.id in waiting }) return@withLock
         val before = dao.blocksOf(essayId)
-        val blocks = try { notion.essayBody(token, pageId) } catch (_: NotionException) { return@withLock }
+        val blocks = try { auth.withToken(token) { notion.essayBody(it, pageId) } } catch (_: NotionException) { return@withLock }
         // Blocks already known keep their local ID, so an edit made from the old list still lands on them.
         val known = before.filter { it.blockId != null }.associate { it.blockId to it.id }
         val rows = blocks.mapIndexed { i, b ->

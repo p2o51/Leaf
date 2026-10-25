@@ -28,7 +28,7 @@ class NotionException(val reason: NotionFailure, val status: Int? = null) : IOEx
     /** What to tell the person. Never includes the token or a request body. */
     val userMessage: String
         get() = when (reason) {
-            NotionFailure.Unauthorized -> "Notion 不认这个 token，请重新连接"
+            NotionFailure.Unauthorized -> "Notion 不再认这个连接，请重新连接"
             NotionFailure.Forbidden, NotionFailure.NotFound -> "Leaf 看不到这个页面：在 Notion 里把数据库分享给你的集成"
             NotionFailure.InvalidInput -> "Notion 拒绝了这次修改"
             NotionFailure.RateLimited, NotionFailure.Unavailable -> "Notion 暂时连不上，稍后会自动重试"
