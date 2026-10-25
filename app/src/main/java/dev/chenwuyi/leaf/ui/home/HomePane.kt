@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
@@ -33,9 +34,13 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +56,9 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.animation.core.animateFloatAsState
@@ -58,11 +66,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.HomeFilter
+import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.WallRules
+import dev.chenwuyi.leaf.ui.component.ColorDots
 import dev.chenwuyi.leaf.ui.component.ScribbleChip
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
@@ -87,6 +99,7 @@ fun HomePane(
     onOpenSettings: () -> Unit,
     onOpenDrawer: () -> Unit,
     modifier: Modifier = Modifier,
+    actions: EssayActions = EssayActions(),
 ) {
     val scope = rememberCoroutineScope()
     val bar = rememberSearchBarState()
@@ -124,13 +137,14 @@ fun HomePane(
             if (!all) {
                 item(key = "filter", span = StaggeredGridItemSpan.FullLine) { FilterTitle(filter, Modifier.animateItem()) }
             }
-            // Filtered, the strip and the essays show only when they have something that matches.
-            if (all || scribbles.isNotEmpty()) {
+            // The strip shows only when there is something on it: no scribbles, no strip and no placeholder.
+            if (scribbles.isNotEmpty()) {
                 item(key = "strip", span = StaggeredGridItemSpan.FullLine) { ScribbleStrip(scribbles, onOpenWall, bleed = 12.dp) }
             }
             if (all || sorted.isNotEmpty()) {
                 item(key = "essays-title", span = StaggeredGridItemSpan.FullLine) {
-                    Text("随笔", Modifier.padding(start = 6.dp, top = 8.dp).animateItem(), style = if (all) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium)
+                    // A quiet section label, not a page title: the cards are what the eye should land on.
+                    Text("随笔", Modifier.padding(start = 6.dp, top = 6.dp).animateItem(), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (all && sorted.isEmpty()) {
@@ -144,7 +158,7 @@ fun HomePane(
                 }
             }
             items(sorted, key = { it.id }) { e ->
-                EssayCard(e, active = e.id == activeEssayId, tall = e.cover != null && e.id.hashCode() % 2 == 0, onClick = { onOpenEssay(e.id) }, modifier = Modifier.animateItem())
+                ManagedEssayCard(e, active = e.id == activeEssayId, onOpen = { onOpenEssay(e.id) }, actions = actions, modifier = Modifier.animateItem())
             }
         }
     }
@@ -256,4 +270,61 @@ private fun FilterTitle(filter: HomeFilter, modifier: Modifier = Modifier) {
 @Composable
 private fun ResultTitle(label: String) {
     Text(label, Modifier.padding(start = 4.dp, top = 14.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** What a long press on an essay card can do. */
+data class EssayActions(
+    val setPinned: (Essay, Boolean) -> Unit = { _, _ -> },
+    val recolor: (Essay, NotionColor) -> Unit = { _, _ -> },
+    val delete: (Essay) -> Unit = {},
+)
+
+/**
+ * An essay card that a long press manages, as Keep's do: the card lifts a little and a menu opens on it
+ * with the card colours, 置顶 and, last, 删除.
+ */
+@Composable
+private fun ManagedEssayCard(essay: Essay, active: Boolean, onOpen: () -> Unit, actions: EssayActions, modifier: Modifier = Modifier) {
+    var menu by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    val lift by animateFloatAsState(if (menu) 1.03f else 1f, LeafMotion.fast(), label = "lift")
+    Box(modifier) {
+        EssayCard(
+            essay,
+            active = active,
+            tall = essay.cover != null && essay.id.hashCode() % 2 == 0,
+            onClick = onOpen,
+            modifier = Modifier.graphicsLayer { scaleX = lift; scaleY = lift },
+            onLongClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                menu = true
+            },
+        )
+        DropdownMenu(menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
+            ColorDots(
+                essay.color,
+                { c ->
+                    menu = false
+                    if (c != essay.color) actions.recolor(essay, c)
+                },
+                Modifier.widthIn(max = 232.dp).padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+            DropdownMenuItem(
+                text = { Text(if (essay.pinned) "取消置顶" else "置顶") },
+                leadingIcon = { Icon(Icons.Rounded.PushPin, null) },
+                onClick = {
+                    menu = false
+                    actions.setPinned(essay, !essay.pinned)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                onClick = {
+                    menu = false
+                    actions.delete(essay)
+                },
+            )
+        }
+    }
 }

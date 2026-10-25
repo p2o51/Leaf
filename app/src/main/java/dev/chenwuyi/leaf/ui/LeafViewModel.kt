@@ -10,6 +10,11 @@ import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.TagRules
 import dev.chenwuyi.leaf.data.WallSort
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,9 +33,15 @@ data class WallState(
     val selected: Set<String> = emptySet(),
 )
 
+@OptIn(DelicateCoroutinesApi::class)
 class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> Unit = {}) : ViewModel() {
     val scribbles: StateFlow<List<Scribble>> = repository.scribbles.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val essays: StateFlow<List<Essay>> = repository.essays.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** Essays deleted from the list but still inside their undo window; they go for good when it ends. */
+    private val deletingState = MutableStateFlow<Set<String>>(emptySet())
+    private val deleteJobs = mutableMapOf<String, Job>()
+
+    val essays: StateFlow<List<Essay>> = combine(repository.essays, deletingState) { all, gone -> if (gone.isEmpty()) all else all.filterNot { it.id in gone } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val filterState = MutableStateFlow<HomeFilter>(HomeFilter.All)
     /** The drawer's pick. Home, the strip and the wall all show only what matches it. */
@@ -135,5 +146,52 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
 
     fun removeBlock(essayId: String, blockId: String) {
         viewModelScope.launch { repository.removeBlocks(essayId, setOf(blockId)) }
+    }
+
+    fun moveBlock(essayId: String, blockId: String, toIndex: Int) {
+        viewModelScope.launch { repository.moveBlock(essayId, blockId, toIndex) }
+    }
+
+    fun setCover(essayId: String, cover: Picture?) {
+        viewModelScope.launch { repository.setCover(essayId, cover) }
+    }
+
+    fun setPinned(essay: Essay, pinned: Boolean) = updateEssay(essay.copy(pinned = pinned))
+
+    fun recolorEssay(essay: Essay, color: NotionColor) = updateEssay(essay.copy(color = color))
+
+    /**
+     * Takes the essay off the list at once and deletes it for good after [undoMillis], unless
+     * [undoDelete] comes first: the snackbar's 撤销 then costs nothing in Notion.
+     */
+    fun deleteEssay(id: String, undoMillis: Long = UndoWindowMillis) {
+        if (openEssayState.value == id) openEssayState.update { null }
+        deletingState.update { it + id }
+        deleteJobs.remove(id)?.cancel()
+        deleteJobs[id] = viewModelScope.launch {
+            delay(undoMillis)
+            repository.deleteEssay(id)
+            deleteJobs.remove(id)
+            deletingState.update { it - id }
+        }
+    }
+
+    fun undoDelete(id: String) {
+        deleteJobs.remove(id)?.cancel()
+        deletingState.update { it - id }
+    }
+
+    override fun onCleared() {
+        // Leaving with a delete still in its undo window keeps the delete: the person asked for it.
+        val pending = deletingState.value
+        if (pending.isNotEmpty()) {
+            deleteJobs.values.forEach { it.cancel() }
+            GlobalScope.launch(NonCancellable) { pending.forEach { repository.deleteEssay(it) } }
+        }
+    }
+
+    companion object {
+        /** A little longer than a short snackbar, so 撤销 never lands after the delete went out. */
+        const val UndoWindowMillis = 5_000L
     }
 }
