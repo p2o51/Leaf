@@ -41,6 +41,18 @@ class NotionJsonTest {
     }
 
     @Test
+    fun should_read_tags_from_the_tag_field_or_any_multi_select_when_reading_rows() {
+        val tagged = JSONObject("""{"id":"p","last_edited_time":"2026-10-20T00:00:00.000Z","properties":{"Name":{"type":"title","title":[]},"标签":{"type":"multi_select","multi_select":[{"name":"东京"},{"name":"写作"}]}}}""")
+        assertEquals(listOf("东京", "写作"), NotionJson.row(tagged, "Name").tags)
+        val ownField = JSONObject("""{"id":"p","last_edited_time":"2026-10-20T00:00:00.000Z","properties":{"Name":{"type":"title","title":[]},"Tags":{"type":"multi_select","multi_select":[{"name":"Sheaf"}]}}}""")
+        assertEquals(listOf("Sheaf"), NotionJson.row(ownField, "Name").tags)
+        val authorsFirst = JSONObject("""{"id":"p","last_edited_time":"2026-10-20T00:00:00.000Z","properties":{"Name":{"type":"title","title":[]},"作者":{"type":"multi_select","multi_select":[{"name":"51"}]},"tags":{"type":"multi_select","multi_select":[{"name":"东京"}]}}}""")
+        assertEquals(listOf("东京"), NotionJson.row(authorsFirst, "Name").tags)
+        val none = JSONObject("""{"id":"p","last_edited_time":"2026-10-20T00:00:00.000Z","properties":{"Name":{"type":"title","title":[]}}}""")
+        assertEquals(emptyList<String>(), NotionJson.row(none, "Name").tags)
+    }
+
+    @Test
     fun should_read_card_colour_from_the_option_colour_before_its_name() {
         assertEquals(NotionColor.Blue, NotionJson.optionColor(JSONObject("""{"name":"随便叫","color":"blue"}""")))
         assertEquals(NotionColor.Red, NotionJson.optionColor(JSONObject("""{"name":"红","color":"default"}""")))

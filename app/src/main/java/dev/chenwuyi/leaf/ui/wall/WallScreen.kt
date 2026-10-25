@@ -83,7 +83,7 @@ class WallActions(
 
 /** The full scribble wall: everything grouped by day (or colour), with sort, select, recolour, delete and 复制到随笔. */
 @Composable
-fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>, actions: WallActions, modifier: Modifier = Modifier) {
+fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>, actions: WallActions, modifier: Modifier = Modifier, title: String = "涂鸦墙") {
     val groups = remember(scribbles, state.sort) { WallRules.groups(scribbles, state.sort) }
     // Start with the tapped scribble's group in view, so its chip lands near the middle of the screen.
     val focusGroup = state.focusId?.let { id -> groups.indexOfFirst { g -> g.scribbles.any { it.id == id } } } ?: -1
@@ -91,7 +91,7 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
 
     Box(modifier.fillMaxSize().sharedKey("wall-surface").background(MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            TopBar(state, actions)
+            TopBar(state, title, actions)
             // One column on a phone; on wide windows the days sit side by side instead of one thin
             // column with most of the screen empty. A plain grid, not a staggered one: days fill row by
             // row, so they read left to right in date order rather than jumping between lanes.
@@ -140,7 +140,7 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
 }
 
 @Composable
-private fun TopBar(state: WallState, actions: WallActions) {
+private fun TopBar(state: WallState, title: String, actions: WallActions) {
     // Entering and leaving selection changes the bar in place: the new row settles in from the start edge
     // while the old one goes at once, so the two bars are never on screen together.
     AnimatedContent(
@@ -148,12 +148,12 @@ private fun TopBar(state: WallState, actions: WallActions) {
         transitionSpec = { (fadeIn(LeafMotion.tool()) + slideInHorizontally(LeafMotion.expressive()) { -it / 8 }) togetherWith ExitTransition.None },
         label = "wall bar",
     ) { selecting ->
-        TopBarRow(state, selecting, actions)
+        TopBarRow(state, title, selecting, actions)
     }
 }
 
 @Composable
-private fun TopBarRow(state: WallState, selecting: Boolean, actions: WallActions) {
+private fun TopBarRow(state: WallState, title: String, selecting: Boolean, actions: WallActions) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         if (selecting) {
             IconButton(onClick = actions.stopSelecting) { Icon(Icons.Rounded.Close, "退出选择") }
@@ -161,7 +161,7 @@ private fun TopBarRow(state: WallState, selecting: Boolean, actions: WallActions
             Pill("全选", null, actions.selectAll)
         } else {
             IconButton(onClick = actions.close) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
-            Text("涂鸦墙", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
+            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
             var sortOpen by remember { mutableStateOf(false) }
             Box {
                 Pill(state.sort.label, Icons.AutoMirrored.Rounded.Sort) { sortOpen = true }

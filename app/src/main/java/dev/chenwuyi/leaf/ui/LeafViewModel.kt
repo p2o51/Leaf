@@ -3,15 +3,18 @@ package dev.chenwuyi.leaf.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.chenwuyi.leaf.data.Essay
+import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.LeafRepository
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.Scribble
+import dev.chenwuyi.leaf.data.TagRules
 import dev.chenwuyi.leaf.data.WallSort
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -29,6 +32,19 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
     val scribbles: StateFlow<List<Scribble>> = repository.scribbles.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val essays: StateFlow<List<Essay>> = repository.essays.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    private val filterState = MutableStateFlow<HomeFilter>(HomeFilter.All)
+    /** The drawer's pick. Home, the strip and the wall all show only what matches it. */
+    val filter: StateFlow<HomeFilter> = filterState.asStateFlow()
+
+    val visibleScribbles: StateFlow<List<Scribble>> = combine(scribbles, filterState) { all, f -> all.filter { TagRules.matches(it, f) } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val visibleEssays: StateFlow<List<Essay>> = combine(essays, filterState) { all, f -> all.filter { TagRules.matches(it, f) } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** What the drawer lists: the colors and tags actually in use. */
+    val tags: StateFlow<List<String>> = combine(scribbles, essays, TagRules::all).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val colorsInUse: StateFlow<List<NotionColor>> = combine(scribbles, essays, TagRules::colorsInUse).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     private val queryState = MutableStateFlow("")
     val query: StateFlow<String> = queryState.asStateFlow()
 
@@ -41,9 +57,19 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
 
     init {
         viewModelScope.launch { seed() }
+        // A scribble recoloured or retagged out of the filter leaves the wall, so it leaves the selection too:
+        // nothing out of sight is deleted, copied or recoloured by the selection bar.
+        viewModelScope.launch {
+            visibleScribbles.collect { shown ->
+                val ids = shown.map(Scribble::id).toSet()
+                wallState.update { w -> if (w == null || w.selected.all { it in ids }) w else w.copy(selected = w.selected intersect ids) }
+            }
+        }
     }
 
     fun setQuery(q: String) = queryState.update { q }
+
+    fun setFilter(filter: HomeFilter) = filterState.update { filter }
 
     fun openWall(focusId: String?, nearIds: Set<String>) {
         wallState.update { WallState(focusId = focusId, nearIds = nearIds, sort = it?.sort ?: WallSort.Newest) }
@@ -62,7 +88,8 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
         w?.copy(selected = if (id in w.selected) w.selected - id else w.selected + id)
     }
 
-    fun selectAll() = wallState.update { it?.copy(selected = scribbles.value.map(Scribble::id).toSet()) }
+    // Only what the wall shows: a filtered wall never selects scribbles that are out of sight.
+    fun selectAll() = wallState.update { it?.copy(selected = visibleScribbles.value.map(Scribble::id).toSet()) }
 
     /** Saves a scribble unless it is empty; [onAdded] gets it for the undo snackbar. */
     fun addScribble(text: String, color: NotionColor, photo: Picture? = null, onAdded: (Scribble) -> Unit = {}) {

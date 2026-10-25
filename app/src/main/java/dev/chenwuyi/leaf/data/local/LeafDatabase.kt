@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ScribbleEntity::class, EssayEntity::class, EssayBlockEntity::class, OutboxEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class LeafDatabase : RoomDatabase() {
@@ -18,13 +18,20 @@ abstract class LeafDatabase : RoomDatabase() {
     companion object {
         fun open(context: Context): LeafDatabase =
             Room.databaseBuilder(context.applicationContext, LeafDatabase::class.java, "leaf.db")
-                .addMigrations(Migration1To2)
+                .addMigrations(Migration1To2, Migration2To3)
                 .build()
 
         /** 2: image blocks in essays keep their picture. */
         val Migration1To2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE essay_blocks ADD COLUMN photo TEXT")
+            }
+        }
+
+        /** 3: essays keep their 标签 for the drawer. */
+        val Migration2To3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE essays ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
             }
         }
     }

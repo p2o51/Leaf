@@ -2,8 +2,10 @@ package dev.chenwuyi.leaf.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -58,6 +60,19 @@ fun EssayCard(essay: Essay, active: Boolean, tall: Boolean, onClick: () -> Unit,
             }
             if (essay.title.isBlank() && essay.previewText.isBlank()) {
                 Text("空白随笔", Modifier.padding(top = 6.dp), style = EssayTitleStyle.copy(fontWeight = FontWeight.Normal), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            // Tags sit at the foot of the card like Keep's labels, quiet enough to read past.
+            if (essay.tags.isNotEmpty()) {
+                FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    essay.tags.forEach { tag ->
+                        Text(
+                            tag,
+                            Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)).padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }

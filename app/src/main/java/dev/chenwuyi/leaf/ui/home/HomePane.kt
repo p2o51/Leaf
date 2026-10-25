@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,10 +17,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
@@ -29,7 +33,7 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExpandedFullScreenSearchBar
@@ -56,10 +60,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.data.Essay
+import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.WallRules
 import dev.chenwuyi.leaf.ui.component.ScribbleChip
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
+import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
 import kotlinx.coroutines.launch
 
 /**
@@ -72,10 +78,14 @@ import kotlinx.coroutines.launch
 fun HomePane(
     scribbles: List<Scribble>,
     essays: List<Essay>,
+    filter: HomeFilter,
+    allScribbles: List<Scribble>,
+    allEssays: List<Essay>,
     activeEssayId: String?,
     onOpenWall: (focusId: String?, near: Set<String>) -> Unit,
     onOpenEssay: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenDrawer: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -86,7 +96,7 @@ fun HomePane(
         snapshotFlow { bar.currentValue }.collect { if (it == SearchBarValue.Collapsed) text.setTextAndPlaceCursorAtEnd("") }
     }
     val sorted = WallRules.searchEssays(essays, "")
-    val inputField: @Composable () -> Unit = { SearchField(text, bar, onOpenSettings) }
+    val inputField: @Composable () -> Unit = { SearchField(text, bar, onOpenSettings, onOpenDrawer) }
 
     BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.surface)) {
         val columns = when {
@@ -109,13 +119,28 @@ fun HomePane(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            item(key = "strip", span = StaggeredGridItemSpan.FullLine) { ScribbleStrip(scribbles, onOpenWall, bleed = 12.dp) }
-            item(key = "essays-title", span = StaggeredGridItemSpan.FullLine) {
-                Text("随笔", Modifier.padding(start = 6.dp, top = 8.dp), style = MaterialTheme.typography.headlineMedium)
+            val all = filter == HomeFilter.All
+            // A filter names itself where the page starts, the way Keep titles a label, and back clears it.
+            if (!all) {
+                item(key = "filter", span = StaggeredGridItemSpan.FullLine) { FilterTitle(filter, Modifier.animateItem()) }
             }
-            if (sorted.isEmpty()) {
+            // Filtered, the strip and the essays show only when they have something that matches.
+            if (all || scribbles.isNotEmpty()) {
+                item(key = "strip", span = StaggeredGridItemSpan.FullLine) { ScribbleStrip(scribbles, onOpenWall, bleed = 12.dp) }
+            }
+            if (all || sorted.isNotEmpty()) {
+                item(key = "essays-title", span = StaggeredGridItemSpan.FullLine) {
+                    Text("随笔", Modifier.padding(start = 6.dp, top = 8.dp).animateItem(), style = if (all) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium)
+                }
+            }
+            if (all && sorted.isEmpty()) {
                 item(key = "empty", span = StaggeredGridItemSpan.FullLine) {
                     Text("还没有随笔。点右下角的 + 写第一篇。", Modifier.padding(6.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (!all && scribbles.isEmpty() && sorted.isEmpty()) {
+                item(key = "empty-filter", span = StaggeredGridItemSpan.FullLine) {
+                    Text("这里现在是空的", Modifier.padding(6.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             items(sorted, key = { it.id }) { e ->
@@ -131,8 +156,9 @@ fun HomePane(
     ) {
         SearchResults(
             query = text.text.toString(),
-            scribbles = scribbles,
-            essays = essays,
+            // Search looks through everything, whatever the drawer is filtering.
+            scribbles = allScribbles,
+            essays = allEssays,
             onOpenScribble = { id ->
                 // The search page is its own window above home, so it folds away before the wall flies in.
                 scope.launch { bar.snapTo(0f) }
@@ -149,7 +175,7 @@ fun HomePane(
 /** M3's input field. Collapsed it carries Leaf's mark (settings) at the end; open, the magnifier turns into back. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenSettings: () -> Unit) {
+private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenSettings: () -> Unit, onOpenDrawer: () -> Unit) {
     val scope = rememberCoroutineScope()
     val expanded = bar.targetValue == SearchBarValue.Expanded
     val turn by animateFloatAsState(if (expanded) 1f else 0f, LeafMotion.fast(), label = "lead")
@@ -159,9 +185,10 @@ private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenSetting
         onSearch = {},
         placeholder = { Text("搜索随笔和涂鸦") },
         leadingIcon = {
-            IconButton(onClick = { scope.launch { if (expanded) bar.animateToCollapsed() else bar.animateToExpanded() } }) {
+            // Collapsed, the leading icon opens the drawer, as in Keep; open, it turns into back.
+            IconButton(onClick = { if (expanded) scope.launch { bar.animateToCollapsed() } else onOpenDrawer() }) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Search, null, Modifier.graphicsLayer { alpha = 1f - turn; rotationZ = 90f * turn })
+                    Icon(Icons.Rounded.Menu, if (expanded) null else "分类", Modifier.graphicsLayer { alpha = 1f - turn; rotationZ = 90f * turn })
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, if (expanded) "关闭搜索" else null, Modifier.graphicsLayer { alpha = turn; rotationZ = -90f * (1f - turn) })
                 }
             }
@@ -205,6 +232,23 @@ private fun SearchResults(query: String, scribbles: List<Scribble>, essays: List
         if (hitEssays.isNotEmpty()) {
             item(key = "essays-title") { ResultTitle("随笔") }
             items(hitEssays, key = { it.id }) { e -> EssayCard(e, active = false, tall = false, onClick = { onOpenEssay(e.id) }, modifier = Modifier.animateItem()) }
+        }
+    }
+}
+
+/** The drawer's pick as the page's heading: a color with its swatch, or a tag. */
+@Composable
+private fun FilterTitle(filter: HomeFilter, modifier: Modifier = Modifier) {
+    val tones = LocalNotionTones.current
+    Row(modifier.padding(start = 6.dp, top = 6.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        when (filter) {
+            is HomeFilter.ByColor -> {
+                Box(Modifier.size(22.dp).clip(CircleShape).background(tones.fill(filter.color)))
+                Spacer(Modifier.width(12.dp))
+                Text("${filter.color.label}色", style = MaterialTheme.typography.headlineMedium)
+            }
+            is HomeFilter.ByTag -> Text("#${filter.name}", style = MaterialTheme.typography.headlineMedium)
+            HomeFilter.All -> Unit
         }
     }
 }
