@@ -1,6 +1,8 @@
 package dev.chenwuyi.leaf.ui.home
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -18,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
@@ -31,6 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -63,12 +68,15 @@ fun ScribbleStrip(scribbles: List<Scribble>, onOpen: (focusId: String?, near: Se
     val pad = with(LocalDensity.current) { 22.dp.toPx() }
     val rows = remember(scribbles) { WallRules.stripRows(scribbles.sortedByDescending { it.createdAt }) }
     val isDragged by rememberUpdatedState(dragged)
+    // A finger resting on the strip stops the drift at once, so the chip under it is still there when
+    // the tap lands (a drifting target opened a neighbour now and then).
+    val touched = remember { mutableStateOf(false) }
 
     LaunchedEffect(scroll) {
         var direction = 1
         while (true) {
             val now = withFrameNanos { it / 1_000_000 }
-            if (isDragged) {
+            if (isDragged || touched.value) {
                 pausedUntil.longValue = now + PauseAfterTouchMillis
                 continue
             }
@@ -96,6 +104,16 @@ fun ScribbleStrip(scribbles: List<Scribble>, onOpen: (focusId: String?, near: Se
                     Brush.horizontalGradient(0f to Color.Transparent, fade to Color.Black, 1f - fade to Color.Black, 1f to Color.Transparent),
                     blendMode = BlendMode.DstIn,
                 )
+            }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    touched.value = true
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                    } while (event.changes.any { it.pressed })
+                    touched.value = false
+                }
             }
             .clickable(interactionSource = null, indication = null) { onOpen(null, emptySet()) }
             .horizontalScroll(scroll)

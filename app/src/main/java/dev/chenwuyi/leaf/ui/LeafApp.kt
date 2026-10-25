@@ -40,6 +40,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,7 +85,8 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
     val wall by vm.wall.collectAsStateWithLifecycle()
     val connection by settings.connection.collectAsStateWithLifecycle()
     val syncStatus by settings.status.collectAsStateWithLifecycle()
-    var settingsOpen by remember { mutableStateOf(false) }
+    // Saveable, so a theme switch or rotation keeps the page, menu or sheet open instead of dropping to home.
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
 
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -95,8 +98,8 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
         }
     }
 
-    var menuOpen by remember { mutableStateOf(false) }
-    var capture by remember { mutableStateOf<Capture?>(null) }
+    var menuOpen by rememberSaveable { mutableStateOf(false) }
+    var capture by rememberSaveable(stateSaver = CaptureSaver) { mutableStateOf<Capture?>(null) }
     val context = LocalContext.current
     val voice = remember { VoiceSession(VoiceRecognizers.forScribbles(context), scope) }
     // Closing the sheet, or switching it to text or a photo, drops a take still recording.
@@ -281,3 +284,23 @@ private fun Panes(
         }
     }
 }
+
+// Only a picked local photo is worth keeping across recreation; sample and remote pictures never open a sheet.
+private val CaptureSaver = Saver<Capture?, String>(
+    save = { c ->
+        when (c) {
+            Capture.Text -> "text"
+            Capture.Voice -> "voice"
+            is Capture.Photo -> (c.picture as? Picture.Local)?.let { "photo:" + it.uri } ?: ""
+            null -> ""
+        }
+    },
+    restore = { s ->
+        when {
+            s == "text" -> Capture.Text
+            s == "voice" -> Capture.Voice
+            s.startsWith("photo:") -> Capture.Photo(Picture.Local(s.removePrefix("photo:")))
+            else -> null
+        }
+    },
+)
