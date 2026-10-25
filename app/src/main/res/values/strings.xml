@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Leaf</string>
+    <string name="quick_write">记一句</string>
+    <string name="quick_write_long">记一条涂鸦</string>
+    <string name="quick_speak">说一句</string>
+    <string name="quick_speak_long">说一句涂鸦</string>
+    <string name="quick_process_text">记进 Leaf</string>
+    <string name="widget_title">涂鸦墙</string>
+    <string name="widget_empty">还没有涂鸦</string>
+    <string name="widget_description">最近的涂鸦，和记一句、说一句</string>
 </resources>
