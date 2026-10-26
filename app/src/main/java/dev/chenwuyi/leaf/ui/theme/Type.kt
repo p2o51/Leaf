@@ -1,6 +1,9 @@
 package dev.chenwuyi.leaf.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -15,8 +18,11 @@ val GoogleSansFlex = FontFamily(
     Font(R.font.google_sans_flex_700, FontWeight.Bold),
 )
 
-// Reading text (card previews, the editor) uses the system serif so Chinese gets Noto Serif CJK.
-val ReadingFamily = FontFamily.Serif
+/**
+ * Reading text (card previews, the editor). Serif by default, the system serif so Chinese gets Noto Serif
+ * CJK; 设置 › 外观 can switch it to Google Sans Flex, whose missing CJK glyphs fall back to Noto Sans CJK.
+ */
+val LocalReadingFamily = staticCompositionLocalOf<FontFamily> { FontFamily.Serif }
 
 private val base = Typography()
 
@@ -35,7 +41,15 @@ val LeafTypography = Typography(
     labelSmall = base.labelSmall.copy(fontFamily = GoogleSansFlex),
 )
 
-val EssayTitleStyle = TextStyle(fontFamily = ReadingFamily, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp)
-val EssayPreviewStyle = TextStyle(fontFamily = ReadingFamily, fontSize = 13.5.sp, lineHeight = 22.sp)
-val EditorTitleStyle = TextStyle(fontFamily = ReadingFamily, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 38.sp)
-val EditorBodyStyle = TextStyle(fontFamily = ReadingFamily, fontSize = 18.sp, lineHeight = 32.sp)
+val EssayTitleStyle: TextStyle
+    @Composable @ReadOnlyComposable get() = TextStyle(fontFamily = LocalReadingFamily.current, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, lineHeight = 24.sp)
+val EssayPreviewStyle: TextStyle
+    @Composable @ReadOnlyComposable get() = TextStyle(fontFamily = LocalReadingFamily.current, fontSize = 13.5.sp, lineHeight = 22.sp)
+val EditorTitleStyle: TextStyle
+    @Composable @ReadOnlyComposable get() = TextStyle(fontFamily = LocalReadingFamily.current, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 38.sp)
+val EditorBodyStyle: TextStyle
+    @Composable @ReadOnlyComposable get() = TextStyle(fontFamily = LocalReadingFamily.current, fontSize = 18.sp, lineHeight = 32.sp)
+
+/** The essay's own title on its page, set large like a magazine cover line. */
+val EssayHeadlineStyle: TextStyle
+    @Composable @ReadOnlyComposable get() = TextStyle(fontFamily = LocalReadingFamily.current, fontWeight = FontWeight.Bold, fontSize = 34.sp, lineHeight = 44.sp, letterSpacing = (-0.3).sp)

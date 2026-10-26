@@ -7,10 +7,13 @@ import dev.chenwuyi.leaf.data.notion.NotionCredential
 import dev.chenwuyi.leaf.data.notion.NotionException
 import dev.chenwuyi.leaf.data.notion.NotionOAuthResult
 import dev.chenwuyi.leaf.data.notion.NotionOAuthSession
+import dev.chenwuyi.leaf.data.settings.Appearance
+import dev.chenwuyi.leaf.data.settings.AppearanceStore
 import dev.chenwuyi.leaf.data.settings.Connection
-import dev.chenwuyi.leaf.data.settings.MemoryRelayStore
-import dev.chenwuyi.leaf.data.settings.RelayConnection
-import dev.chenwuyi.leaf.data.settings.RelayStore
+import dev.chenwuyi.leaf.data.settings.ElevenLabsKey
+import dev.chenwuyi.leaf.data.settings.MemoryAppearanceStore
+import dev.chenwuyi.leaf.data.settings.MemorySpeechKeyStore
+import dev.chenwuyi.leaf.data.settings.SpeechKeyStore
 import dev.chenwuyi.leaf.data.sync.NotionSetup
 import dev.chenwuyi.leaf.data.sync.SyncStatus
 import java.io.IOException
@@ -34,8 +37,9 @@ class SettingsViewModel(
     val status: StateFlow<SyncStatus>,
     private val syncNow: () -> Unit,
     private val afterDisconnect: suspend () -> Unit,
-    private val relay: RelayStore = MemoryRelayStore(),
+    private val speechKey: SpeechKeyStore = MemorySpeechKeyStore(),
     private val oauth: NotionOAuthSession = NotionOAuthSession(),
+    private val appearanceStore: AppearanceStore = MemoryAppearanceStore(),
 ) : ViewModel() {
     private val stepState = MutableStateFlow<ConnectStep>(ConnectStep.Token())
     val step: StateFlow<ConnectStep> = stepState.asStateFlow()
@@ -76,36 +80,40 @@ class SettingsViewModel(
         }
     }
 
-    /** The Relay used for 按住说, by host; null when none is saved. */
-    val relayHost: StateFlow<String?> = relay.host
-    private val relayErrorState = MutableStateFlow<String?>(null)
-    val relayError: StateFlow<String?> = relayErrorState.asStateFlow()
+    /** The ElevenLabs key 按住说 uses, masked; null when none is saved. */
+    val speechKeyMasked: StateFlow<String?> = speechKey.masked
+    private val speechKeyErrorState = MutableStateFlow<String?>(null)
+    val speechKeyError: StateFlow<String?> = speechKeyErrorState.asStateFlow()
 
-    /** Takes Sheaf's Relay connection string; [onSaved] runs only once it is in the vault. */
-    fun saveRelay(text: String, onSaved: () -> Unit) {
-        val parsed = RelayConnection.parse(text)
-        if (parsed == null) {
-            relayErrorState.value = "看不懂这个连接串：在 Sheaf 的「接力」里复制，形如 https://…/#token=…"
+    /** Takes a pasted ElevenLabs API key; [onSaved] runs only once it is in the vault. */
+    fun saveSpeechKey(text: String, onSaved: () -> Unit) {
+        val key = ElevenLabsKey.parse(text)
+        if (key == null) {
+            speechKeyErrorState.value = "这不像 ElevenLabs 的密钥：在 elevenlabs.io › Developers › API Keys 里复制，形如 sk_…"
             return
         }
-        relayErrorState.value = null
+        speechKeyErrorState.value = null
         viewModelScope.launch {
             // The vault writes to disk through the Keystore; a full disk or a broken key is a line, not a crash.
-            val saved = withContext(Dispatchers.IO) { runCatching { relay.save(parsed) } }
+            val saved = withContext(Dispatchers.IO) { runCatching { speechKey.save(key) } }
             if (saved.isSuccess) {
                 onSaved()
             } else {
-                relayErrorState.value = "没存上，稍后再试一次"
+                speechKeyErrorState.value = "没存上，稍后再试一次"
             }
         }
     }
 
-    fun clearRelay() {
-        relayErrorState.value = null
+    fun clearSpeechKey() {
+        speechKeyErrorState.value = null
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { runCatching { relay.clear() } }
+            withContext(Dispatchers.IO) { runCatching { speechKey.clear() } }
         }
     }
+
+    val appearance: StateFlow<Appearance> = appearanceStore.appearance
+
+    fun setAppearance(next: Appearance) = appearanceStore.set(next)
 
     fun discover(token: String) {
         if (token.isBlank()) return

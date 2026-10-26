@@ -21,7 +21,7 @@ private fun isWide(c: Char): Boolean =
 object VoiceCopy {
     fun permission(route: VoiceRoute): String = when (route) {
         VoiceRoute.System -> "只在按住时收音，转写可能经过系统的联网服务"
-        VoiceRoute.Cloud -> "只在按住时收音，松开后经 Relay 发给 ElevenLabs 转写"
+        VoiceRoute.Cloud -> "只在按住时收音，松开后发给 ElevenLabs 转写"
         else -> "只在按住时收音，转写在这台设备上完成"
     }
 
@@ -31,10 +31,11 @@ object VoiceCopy {
     const val Transcribed = "转写好了，改一改再记下"
     const val HoldToTalk = "要按住说话，松开结束"
     const val Denied = "没有麦克风权限，先用打字"
-    const val Unavailable = "这台设备不能语音转写，先用打字，或者在设置里连上 Relay"
+    const val Unavailable = "这台设备不能语音转写，先用打字，或者在设置里填上 ElevenLabs 密钥"
     const val NothingHeard = "没听清，按住再说一次"
     const val Network = "连不上转写服务，稍后再试，或者先用打字"
     const val Busy = "转写服务正忙，稍后再试"
+    const val Unauthorized = "ElevenLabs 不认这个密钥，到设置里换一个，或者先用打字"
     const val Failed = "这次没转写成，按住再说一次，或者先用打字"
 
     fun stop(kind: VoiceException.Kind): String = when (kind) {
@@ -42,6 +43,7 @@ object VoiceCopy {
         VoiceException.Kind.Unavailable -> Unavailable
         VoiceException.Kind.Network -> Network
         VoiceException.Kind.Busy -> Busy
+        VoiceException.Kind.Unauthorized -> Unauthorized
         VoiceException.Kind.Failed -> Failed
     }
 

@@ -1,9 +1,18 @@
 package dev.chenwuyi.leaf
 
 import android.os.Bundle
+import android.graphics.Color
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.chenwuyi.leaf.data.settings.AppearanceStore
+import dev.chenwuyi.leaf.data.settings.ThemeMode
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.chenwuyi.leaf.data.notion.NotionOAuthSession
 import dev.chenwuyi.leaf.ui.LeafApp
@@ -24,7 +33,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val container = (application as LeafApplication).container
         setContent {
-            LeafTheme {
+            AppTheme(container.appearance) {
                 val vm = viewModel { LeafViewModel(container.repository, seed = container.repository::seedSamplesIfEmpty) }
                 val settings = viewModel {
                     SettingsViewModel(
@@ -33,12 +42,33 @@ class MainActivity : ComponentActivity() {
                         status = container.sync.status,
                         syncNow = container.scheduler::now,
                         afterDisconnect = container.repository::seedSamplesIfEmpty,
-                        relay = container.relay,
+                        speechKey = container.speechKey,
                         oauth = NotionOAuthSession.shared,
+                        appearanceStore = container.appearance,
                     )
                 }
                 LeafApp(vm, settings)
             }
         }
     }
+}
+
+/**
+ * [LeafTheme] as 设置 › 外观 picks it: the reading font, and light or dark whatever the system says. The
+ * system bars' icons follow the same choice, so a forced dark page never gets dark status-bar icons.
+ */
+@Composable
+fun ComponentActivity.AppTheme(store: AppearanceStore, content: @Composable () -> Unit) {
+    val appearance by store.appearance.collectAsStateWithLifecycle()
+    val system = isSystemInDarkTheme()
+    val dark = when (appearance.theme) {
+        ThemeMode.System -> system
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+    LaunchedEffect(dark) {
+        val bars = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
+        enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+    }
+    LeafTheme(darkTheme = dark, font = appearance.font, content = content)
 }

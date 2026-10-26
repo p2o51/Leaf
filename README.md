@@ -11,8 +11,8 @@ is an essay with a cover or a Keep-style card colour.
 
 1. **M0 skeleton** (this): theme, sample data, home strip + essay grid, the + menu, the full wall with
    a continuous open animation, select / recolour / delete / 复制到随笔, a basic editor, tablet split.
-2. M1 scribble wall on Notion: OAuth, field mapping, Room + WorkManager sync, hold-to-talk through
-   Relay (ElevenLabs Scribe v2), quick-note panel, widgets, QS tile.
+2. M1 scribble wall on Notion: OAuth, field mapping, Room + WorkManager sync, hold-to-talk with
+   ElevenLabs Scribe v2 (the API key goes in 设置 › 按住说), quick-note panel, widgets, QS tile.
 3. M2 essays: Craft-style block editor, photo and cover upload, card colours.
 4. M3 scribbles meet essays: insert / quote as synced blocks, keyword recommendations, drag-in rail.
 5. M4 voice IME and vector recommendations. M5 (pending): question-style suggestions, multi-user, Pro.

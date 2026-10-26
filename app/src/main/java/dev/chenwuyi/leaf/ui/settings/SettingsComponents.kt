@@ -1,6 +1,8 @@
 package dev.chenwuyi.leaf.ui.settings
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,11 +33,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.ui.component.SegmentedColumn
+import dev.chenwuyi.leaf.ui.theme.LeafMotion
 
 // Settings building blocks, the same as Sheaf's (its SettingsComponents.kt) so the sister apps' settings
 // read as one design: a primary label over each group, its rows as a segmented list, rows led by a plain
@@ -140,5 +146,52 @@ internal fun SecretField(value: String, onValueChange: (String) -> Unit, placeho
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         )
+    }
+}
+
+/**
+ * Icon and title, then the choices as one connected group under them (MD3's connected button group,
+ * drawn like the editor's 样式 tabs). [face] gives a choice its own text style, so a font choice reads in that font.
+ */
+@Composable
+internal fun <T> ChoiceRow(
+    icon: ImageVector,
+    title: String,
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onPick: (T) -> Unit,
+    face: @Composable (T) -> TextStyle = { MaterialTheme.typography.labelLarge },
+) {
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(16.dp))
+            Text(title, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium))
+        }
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            options.forEach { option ->
+                val on = option == selected
+                val fill by animateColorAsState(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, LeafMotion.tool(), label = "choice")
+                Text(
+                    label(option),
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(fill)
+                        .selectable(on, role = Role.RadioButton) { onPick(option) }
+                        .padding(vertical = 10.dp),
+                    style = face(option),
+                    color = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }

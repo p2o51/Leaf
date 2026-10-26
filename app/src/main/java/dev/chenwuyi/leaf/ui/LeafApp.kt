@@ -67,15 +67,16 @@ import dev.chenwuyi.leaf.ui.component.PagePredictiveBack
 import dev.chenwuyi.leaf.ui.component.backPose
 import dev.chenwuyi.leaf.ui.component.rememberBackPreview
 import dev.chenwuyi.leaf.ui.component.LocalWallVisibilityScope
+import dev.chenwuyi.leaf.ui.essay.EditorSync
 import dev.chenwuyi.leaf.ui.essay.EssayEditor
 import dev.chenwuyi.leaf.ui.home.AddKind
 import dev.chenwuyi.leaf.ui.home.AddMenu
+import dev.chenwuyi.leaf.ui.home.EssayActions
 import dev.chenwuyi.leaf.ui.home.HomeDrawer
 import dev.chenwuyi.leaf.ui.home.HomePane
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 import dev.chenwuyi.leaf.ui.settings.SettingsScreen
 import dev.chenwuyi.leaf.ui.settings.SettingsViewModel
-import dev.chenwuyi.leaf.ui.settings.syncLine
 import dev.chenwuyi.leaf.ui.wall.WallActions
 import dev.chenwuyi.leaf.ui.wall.WallScreen
 import kotlinx.coroutines.delay
@@ -163,6 +164,21 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
         tapScribble = { id -> vm.openWall(id, emptySet()) },
     )
 
+    val essayActions = EssayActions(
+        setPinned = vm::setPinned,
+        recolor = vm::recolorEssay,
+        delete = { e ->
+            vm.deleteEssay(e.id)
+            scope.launch {
+                snackbar.currentSnackbarData?.dismiss()
+                val title = e.title.ifBlank { "无标题" }
+                // Short, so it is gone before the delete goes out (LeafViewModel.UndoWindowMillis).
+                val result = snackbar.showSnackbar("删了《$title》", actionLabel = "撤销", duration = SnackbarDuration.Short)
+                if (result == SnackbarResult.ActionPerformed) vm.undoDelete(e.id)
+            }
+        },
+    )
+
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         SharedTransitionLayout {
             CompositionLocalProvider(LocalSharedTransitionScope provides this) {
@@ -222,6 +238,7 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                                 },
                                                 vm::openEssay, { settingsOpen = true }, { scope.launch { drawer.open() } },
                                                 Modifier.fillMaxSize(),
+                                                actions = essayActions,
                                             )
                                             AddMenu(
                                                 menuOpen,
@@ -239,7 +256,13 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                     editorKey = openEssay?.id,
                                     back = essayBack,
                                     editor = openEssay?.let { e ->
-                                        { m -> EssayEditor(e, allScribbles, syncLine(connection, syncStatus), vm::closeEssay, vm::updateEssay, { id -> vm.removeBlock(e.id, id) }, m) }
+                                        { m ->
+                                            EssayEditor(
+                                                e, allScribbles, EditorSync(connection != null, syncStatus), vm::closeEssay, vm::updateEssay, { id -> vm.removeBlock(e.id, id) }, m,
+                                                onMoveBlock = { id, to -> vm.moveBlock(e.id, id, to) },
+                                                onCover = { cover -> vm.setCover(e.id, cover) },
+                                            )
+                                        }
                                     },
                                 )
                             }

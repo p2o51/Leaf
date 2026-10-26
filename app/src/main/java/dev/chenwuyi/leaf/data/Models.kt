@@ -56,6 +56,8 @@ sealed interface EssayBlock {
         val text: String,
         val type: String = "paragraph",
         val color: NotionColor = NotionColor.Default,
+        /** Holds more in Notion than Leaf can write back (children, links, formatting), so it stays in place. */
+        val fixed: Boolean = false,
     ) : EssayBlock
 
     /** A Notion block Leaf does not edit (table, embed, database…). Shown as a card, left untouched. */
@@ -66,6 +68,14 @@ sealed interface EssayBlock {
 
     /** An image block; [caption] is Notion's image caption. */
     data class Photo(override val id: String, val picture: Picture, val caption: String = "") : EssayBlock
+
+    companion object {
+        /** Notion's divider block; Leaf draws it as a rule and can insert one. */
+        const val Divider = "divider"
+
+        /** Notion's table of contents block; Leaf draws it as a small 目录 key that opens the outline. */
+        const val TableOfContents = "table_of_contents"
+    }
 }
 
 /** Every database row other than the wall. The title is the page title; blocks are the page body. */
@@ -81,6 +91,8 @@ data class Essay(
     val storedPreview: String = "",
     /** The row's 标签 multi-select, read from Notion; see [TagRules]. */
     val tags: List<String> = emptyList(),
+    /** When the page was created; null for a row pulled before Leaf kept it, which shows [editedAt] instead. */
+    val createdAt: Instant? = null,
 ) {
     val previewText: String
         get() = blocks.filterIsInstance<EssayBlock.Paragraph>().joinToString(" ") { it.text }.trim().ifEmpty { storedPreview }

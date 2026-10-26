@@ -12,6 +12,7 @@ import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.SampleData
 import dev.chenwuyi.leaf.ui.essay.EditorStart
+import dev.chenwuyi.leaf.ui.essay.EditorSync
 import dev.chenwuyi.leaf.ui.essay.EssayEditor
 import dev.chenwuyi.leaf.ui.essay.ToolPanel
 import dev.chenwuyi.leaf.ui.theme.LeafTheme
@@ -78,7 +79,7 @@ class EditorScreenshots {
 
     @Composable
     private fun editor(start: EditorStart) = LeafTheme {
-        EssayEditor(essay, SampleData.scribbles, "已同步", {}, {}, {}, start = start)
+        EssayEditor(essay, SampleData.scribbles, EditorSync(connected = true), {}, {}, {}, start = start)
     }
 
     private fun shoot(name: String, content: @Composable () -> Unit) {

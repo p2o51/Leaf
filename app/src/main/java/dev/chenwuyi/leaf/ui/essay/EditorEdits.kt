@@ -19,6 +19,7 @@ enum class InsertKind(val label: String, val type: String, val glyph: String) {
     Bullet("列表", "bulleted_list_item", "•"),
     Numbered("编号", "numbered_list_item", "1."),
     Photo("照片", "image", ""),
+    Divider("分割线", EssayBlock.Divider, ""),
     Scribble("涂鸦", "paragraph", ""),
     ;
 
@@ -102,6 +103,10 @@ object EditorEdits {
         while (i >= 0 && (essay.blocks[i] as? EssayBlock.Paragraph)?.type == "numbered_list_item") { n++; i-- }
         return n
     }
+
+    /** The headings the outline lists, in page order; empty ones are left out. */
+    fun headings(essay: Essay): List<EssayBlock.Paragraph> =
+        essay.blocks.filterIsInstance<EssayBlock.Paragraph>().filter { it.type.startsWith("heading") && it.text.isNotBlank() }
 
     private fun Essay.replace(block: EssayBlock): Essay = copy(blocks = blocks.map { if (it.id == block.id) block else it })
 

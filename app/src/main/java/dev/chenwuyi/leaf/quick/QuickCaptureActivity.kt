@@ -20,7 +20,7 @@ import dev.chenwuyi.leaf.ui.capture.Capture
 import dev.chenwuyi.leaf.ui.capture.CaptureSheet
 import dev.chenwuyi.leaf.ui.capture.VoiceSession
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
-import dev.chenwuyi.leaf.ui.theme.LeafTheme
+import dev.chenwuyi.leaf.AppTheme
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -39,7 +39,7 @@ class QuickCaptureActivity : ComponentActivity() {
         capture = QuickIntents.capture(intent) ?: return finish()
         val container = (application as LeafApplication).container
         setContent {
-            LeafTheme {
+            AppTheme(container.appearance) {
                 val context = LocalContext.current
                 val scope = rememberCoroutineScope()
                 val voice = remember { VoiceSession(VoiceRecognizers.forScribbles(context), scope) }

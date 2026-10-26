@@ -1,6 +1,7 @@
 package dev.chenwuyi.leaf.data.local
 
 import dev.chenwuyi.leaf.data.Essay
+import dev.chenwuyi.leaf.data.BlockOrder
 import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.data.LeafRepository
 import dev.chenwuyi.leaf.data.NotionColor
@@ -80,7 +81,7 @@ class RoomLeafRepository(
     }
 
     override suspend fun newEssay(): Essay {
-        val e = Essay(newId(), "", listOf(EssayBlock.Paragraph(newId(), "")), NotionColor.Default, null, false, clock())
+        val e = Essay(newId(), "", listOf(EssayBlock.Paragraph(newId(), "")), NotionColor.Default, null, false, clock(), createdAt = clock())
         dao.upsertEssays(listOf(e.toEntity()))
         dao.upsertBlocks(e.blocks.mapIndexed { i, b -> b.toEntity(e.id, i, null) })
         queue(OutboxOp.SaveEssay, e.id)
@@ -127,6 +128,41 @@ class RoomLeafRepository(
         dao.deleteBlocks(gone.map { it.id })
         dao.essay(essayId)?.let { dao.upsertEssays(listOf(it.copy(editedAt = clock().toEpochMilli()))) }
         gone.forEach { row -> row.blockId?.let { queue(OutboxOp.DeleteBlock, it) } }
+    }
+
+    /**
+     * Notion has no call that moves a block, so the moved block is written again after its new neighbour
+     * and the old one deleted; the new one goes out first, so a failure in between never loses the words.
+     */
+    override suspend fun moveBlock(essayId: String, blockId: String, toIndex: Int): Unit = essayWrites.withLock {
+        val rows = dao.blocksOf(essayId)
+        val moved = rows.firstOrNull { it.id == blockId } ?: return@withLock
+        val reordered = BlockOrder.moveAt(rows, rows.indexOf(moved), toIndex)
+        if (reordered.map { it.id } == rows.map { it.id }) return@withLock
+        dao.upsertBlocks(reordered.mapIndexed { i, row -> row.copy(position = i) })
+        dao.essay(essayId)?.let { dao.upsertEssays(listOf(it.copy(editedAt = clock().toEpochMilli()))) }
+        // A block not in Notion yet is created at wherever it sits when its SaveBlock runs.
+        if (moved.blockId != null) queue(OutboxOp.MoveBlock, blockId)
+    }
+
+    override suspend fun setCover(essayId: String, cover: Picture?) {
+        val stored = dao.essay(essayId) ?: return
+        val url = when (cover) {
+            null -> null
+            is Picture.Local -> if (cover.uri.startsWith("content:")) withContext(Dispatchers.IO) { importPhoto(cover.uri) } ?: return else cover.uri
+            is Picture.Remote -> cover.url
+            is Picture.Sample -> return dao.upsertEssays(listOf(stored.copy(sampleCover = cover.art.name)))
+        }
+        dao.upsertEssays(listOf(stored.copy(coverUrl = url, sampleCover = if (cover == null) null else stored.sampleCover, editedAt = clock().toEpochMilli())))
+        if (stored.sample) return
+        queue(OutboxOp.SaveCover, essayId)
+    }
+
+    override suspend fun deleteEssay(essayId: String): Unit = essayWrites.withLock {
+        val stored = dao.essay(essayId) ?: return@withLock
+        dao.deleteBlocksOf(listOf(essayId))
+        dao.deleteEssays(listOf(essayId))
+        stored.pageId?.let { queue(OutboxOp.DeleteEssay, it) }
     }
 
     override suspend fun copyToEssay(scribbleIds: Set<String>, essayId: String?): String {
@@ -179,4 +215,6 @@ fun Essay.toEntity(sample: Boolean = false): EssayEntity = EssayEntity(
     bodyLoaded = true,
     sample = sample,
     tags = tagColumn(tags),
+    coverUrl = (cover as? Picture.Local)?.uri ?: (cover as? Picture.Remote)?.url,
+    createdAt = createdAt?.toEpochMilli(),
 )

@@ -24,10 +24,15 @@ data class RemoteRow(
     val coverUrl: String?,
     val editedAt: Instant,
     val tags: List<String> = emptyList(),
+    val createdAt: Instant? = null,
 )
 
 /** An essay body block. [type] is Notion's block type; only text-bearing types are editable in Leaf. */
-data class RemoteBlock(val blockId: String, val type: String, val text: String, val color: NotionColor, val imageUrl: String? = null) {
+/**
+ * One top-level block of an essay. [fixed] marks a text block Leaf cannot write again as it is (children,
+ * links, formatting, a ticked box, a callout's icon): moving it would mean deleting what Leaf never loaded.
+ */
+data class RemoteBlock(val blockId: String, val type: String, val text: String, val color: NotionColor, val imageUrl: String? = null, val fixed: Boolean = false) {
     val editable: Boolean get() = type in NotionJson.TEXT_TYPES
 }
 
@@ -92,6 +97,7 @@ object NotionJson {
             coverUrl = fileUrl(json.optJSONObject("cover")),
             editedAt = Instant.parse(json.getString("last_edited_time")),
             tags = tags(props),
+            createdAt = json.optString("created_time").takeIf { it.isNotBlank() }?.let { runCatching { Instant.parse(it) }.getOrNull() },
         )
     }
 
@@ -143,7 +149,21 @@ object NotionJson {
             else -> ""
         }
         val image = if (type == "image") fileUrl(value) else null
-        return RemoteBlock(block.getString("id"), type, text, NotionColor.fromApi(value.optString("color")), image)
+        val fixed = type in TEXT_TYPES && (block.optBoolean("has_children") || type == "callout" || type == "toggle" ||
+            value.optBoolean("is_toggleable") || value.optBoolean("checked") || !isPlain(value.optJSONArray("rich_text")))
+        return RemoteBlock(block.getString("id"), type, text, NotionColor.fromApi(value.optString("color")), image, fixed)
+    }
+
+    /** Whether rich text is only unformatted words, the one thing [textBlock] writes back exactly. */
+    fun isPlain(array: JSONArray?): Boolean {
+        if (array == null) return true
+        return (0 until array.length()).all { i ->
+            val part = array.optJSONObject(i) ?: return@all true
+            val a = part.optJSONObject("annotations")
+            part.optString("type", "text") == "text" && part.optJSONObject("text")?.opt("link").let { it == null || it == JSONObject.NULL } &&
+                part.opt("href").let { it == null || it == JSONObject.NULL } &&
+                (a == null || (listOf("bold", "italic", "strikethrough", "underline", "code").none { a.optBoolean(it) } && a.optString("color", "default") == "default"))
+        }
     }
 
     fun plain(array: JSONArray?): String {
@@ -177,6 +197,12 @@ object NotionJson {
         if (type == "to_do") value.put("checked", false)
         return JSONObject().put("object", "block").put("type", type).put(type, value)
     }
+
+    fun divider(): JSONObject = JSONObject().put("object", "block").put("type", "divider").put("divider", JSONObject())
+
+    /** PATCH body for a page's cover: an uploaded file, or none. */
+    fun cover(uploadId: String?): JSONObject =
+        JSONObject().put("cover", if (uploadId == null) JSONObject.NULL else JSONObject().put("type", "file_upload").put("file_upload", JSONObject().put("id", uploadId)))
 
     fun image(uploadId: String, caption: String): JSONObject =
         JSONObject().put("object", "block").put("type", "image").put("image", JSONObject()

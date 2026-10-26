@@ -1,6 +1,11 @@
 package dev.chenwuyi.leaf.ui.essay
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,6 +36,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.FormatListNumbered
 import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.material.icons.rounded.Gesture
+import androidx.compose.material.icons.rounded.HorizontalRule
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.KeyboardHide
 import androidx.compose.material.icons.rounded.TextFields
@@ -108,7 +114,14 @@ fun EditorToolbar(
         }
         ToolButton(Icons.Rounded.Image, "插入照片", onClick = onPhoto)
         ToolButton(Icons.Rounded.Gesture, "插入涂鸦", onClick = onScribble)
-        if (keyboardUp) ToolButton(Icons.Rounded.KeyboardHide, "收起键盘", onClick = onHideKeyboard)
+        // Grows out of the bar's end with the keyboard rather than popping in: the bar widens on the same spring.
+        AnimatedVisibility(
+            keyboardUp,
+            enter = expandHorizontally(LeafMotion.expressive(), expandFrom = Alignment.Start) + fadeIn(LeafMotion.tool()) + scaleIn(LeafMotion.expressive(), initialScale = 0.6f),
+            exit = shrinkHorizontally(LeafMotion.tool(), shrinkTowards = Alignment.Start) + fadeOut(LeafMotion.tool()) + scaleOut(LeafMotion.tool(), targetScale = 0.6f),
+        ) {
+            ToolButton(Icons.Rounded.KeyboardHide, "收起键盘", onClick = onHideKeyboard)
+        }
     }
 }
 
@@ -154,6 +167,7 @@ fun InsertGrid(
                 Tile(InsertKind.Bullet.label, tile, { onPick(InsertKind.Bullet) }) { Icon(Icons.AutoMirrored.Rounded.FormatListBulleted, null) }
                 Tile(InsertKind.Numbered.label, tile, { onPick(InsertKind.Numbered) }) { Icon(Icons.Rounded.FormatListNumbered, null) }
                 Tile(InsertKind.Photo.label, tile, { onPick(InsertKind.Photo) }) { Icon(Icons.Rounded.Image, null) }
+                Tile(InsertKind.Divider.label, tile, { onPick(InsertKind.Divider) }) { Icon(Icons.Rounded.HorizontalRule, null) }
                 Tile("全部涂鸦", tile, { onPick(InsertKind.Scribble) }) { Icon(Icons.Rounded.Gesture, null) }
             }
         }
