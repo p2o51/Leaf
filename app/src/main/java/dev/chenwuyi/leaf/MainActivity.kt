@@ -2,6 +2,7 @@ package dev.chenwuyi.leaf
 
 import android.os.Bundle
 import android.graphics.Color
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -69,6 +70,12 @@ fun ComponentActivity.AppTheme(store: AppearanceStore, content: @Composable () -
     LaunchedEffect(dark) {
         val bars = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
         enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+        // SystemBarStyle.auto leaves contrast enforcement on, and some ROMs answer it with an opaque
+        // scrim over the gesture bar, so the page stopped short of the screen's bottom edge.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
+        }
     }
     LeafTheme(darkTheme = dark, font = appearance.font, content = content)
 }
