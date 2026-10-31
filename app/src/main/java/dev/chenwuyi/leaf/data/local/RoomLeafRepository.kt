@@ -30,6 +30,8 @@ class RoomLeafRepository(
     private val importPhoto: (String) -> String? = { it },
     private val loadBody: suspend (essayId: String) -> Unit = {},
     private val freshFileUrl: suspend (notionBlockId: String) -> String? = { null },
+    private val readPhoto: (String) -> ByteArray? = { null },
+    private val downloadPhoto: suspend (String) -> ByteArray? = { null },
     private val clock: () -> Instant = Instant::now,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : LeafRepository {
@@ -181,6 +183,14 @@ class RoomLeafRepository(
     }
 
     override suspend fun loadEssayBody(essayId: String) = loadBody(essayId)
+
+    override suspend fun photoBytes(blockId: String): ByteArray? {
+        val row = dao.block(blockId) ?: return null
+        val photo = row.photo ?: return null
+        if (photo.startsWith("file:")) return withContext(Dispatchers.IO) { readPhoto(photo) }
+        // A stored Notion link may have expired; ask for a fresh one when the first try fails.
+        return downloadPhoto(photo) ?: row.blockId?.let { freshFileUrl(it) }?.let { downloadPhoto(it) }
+    }
 
     override suspend fun fileUrl(blockId: String): String? {
         val row = dao.block(blockId) ?: return null

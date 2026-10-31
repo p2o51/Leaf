@@ -86,6 +86,10 @@ class PolishScreenshots {
 
     @Test
     @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun photo_viewer() = shoot("polish-10-photo-viewer") { editor(essay, EditorStart(photo = "i")) }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
     fun no_cover() = shoot("polish-3-essay-no-cover") {
         // A Notion file block at the end shows as a card that opens it.
         editor(essay.copy(cover = null, blocks = essay.blocks + EssayBlock.Attachment("f", "file", "Chen_Wuyi_CV.pdf", "https://example.com/cv.pdf")))

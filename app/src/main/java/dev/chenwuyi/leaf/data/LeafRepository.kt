@@ -28,6 +28,8 @@ interface LeafRepository {
     suspend fun loadEssayBody(essayId: String) {}
     /** A fresh link to an attached file (Notion's signed URLs expire after an hour); null when unreachable. */
     suspend fun fileUrl(blockId: String): String? = null
+    /** An essay photo's image bytes, for saving to the gallery; null for sample art or when unreachable. */
+    suspend fun photoBytes(blockId: String): ByteArray? = null
 
     suspend fun removeBlocks(essayId: String, blockIds: Set<String>)
 

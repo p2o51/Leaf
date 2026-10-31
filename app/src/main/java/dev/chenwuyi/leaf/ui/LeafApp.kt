@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.PaneLayout
+import dev.chenwuyi.leaf.data.local.GallerySaver
 import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.paneLayout
 import dev.chenwuyi.leaf.ui.capture.Capture
@@ -269,6 +270,13 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                                 onMoveBlock = { id, to -> vm.moveBlock(e.id, id, to) },
                                                 onCover = { cover -> vm.setCover(e.id, cover) },
                                                 onOpenFile = { file -> vm.openFile(file, openLink) },
+                                                onSavePhoto = { photo ->
+                                                    scope.launch {
+                                                        val saved = vm.photoBytes(photo)?.let { GallerySaver.save(context, it) } == true
+                                                        snackbar.currentSnackbarData?.dismiss()
+                                                        snackbar.showSnackbar(if (saved) "已存到相册" else "没存上，联网后再试")
+                                                    }
+                                                },
                                             )
                                         }
                                     },

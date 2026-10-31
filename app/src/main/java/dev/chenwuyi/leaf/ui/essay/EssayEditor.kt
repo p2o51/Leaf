@@ -23,6 +23,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,7 +77,6 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.HideImage
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -180,6 +180,7 @@ fun EssayEditor(
     onCover: (Picture?) -> Unit = {},
     start: EditorStart = EditorStart(),
     onOpenFile: (EssayBlock.Attachment) -> Unit = {},
+    onSavePhoto: (EssayBlock.Photo) -> Unit = {},
 ) {
     // Typing goes to a local draft first: waiting for Room's round trip would drop fast keystrokes.
     var draft by remember(essay.id) { mutableStateOf(essay) }
@@ -209,6 +210,17 @@ fun EssayEditor(
     var picking by remember { mutableStateOf(false) }
     var outlineOpen by remember { mutableStateOf(start.outline) }
     var captioning by remember(essay.id) { mutableStateOf<String?>(null) }
+    // The photo open full screen, by block id.
+    var viewing by remember(essay.id) { mutableStateOf(start.photo) }
+    val setCaption = { id: String, caption: String ->
+        edit(draft.copy(blocks = draft.blocks.map { if (it.id == id && it is EssayBlock.Photo) it.copy(caption = caption.replace("\n", "")) else it }))
+    }
+    val removePhoto = { id: String ->
+        if (viewing == id) viewing = null
+        draft = EditorEdits.remove(draft, id)
+        lastEdit = System.currentTimeMillis()
+        onRemoveBlock(id)
+    }
     val keyboard = LocalSoftwareKeyboardController.current
     val keyboardUp = WindowInsets.isImeVisible
     val haptics = LocalHapticFeedback.current
@@ -414,19 +426,27 @@ fun EssayEditor(
                                         block,
                                         captionOpen = captioning == block.id || block.caption.isNotEmpty(),
                                         menuOpen = captioning == MenuFor + block.id,
-                                        pictureModifier = longPressDrag,
+                                        pictureModifier = longPressDrag.pointerInput(block.id) {
+                                            // Only a short tap opens it: a held press belongs to the drag and the menu.
+                                            detectTapGestures(onPress = {
+                                                val at = System.currentTimeMillis()
+                                                if (tryAwaitRelease() && System.currentTimeMillis() - at < viewConfiguration.longPressTimeoutMillis) viewing = block.id
+                                            })
+                                        },
                                         captionModifier = track,
                                         onMenuDismiss = { captioning = null },
                                         onCaptionStart = {
                                             captioning = block.id
                                             focusNext = block.id
                                         },
-                                        onCaption = { caption -> edit(draft.copy(blocks = draft.blocks.map { if (it.id == block.id) block.copy(caption = caption.replace("\n", "")) else it })) },
+                                        onCaption = { caption -> setCaption(block.id, caption) },
+                                        onSave = {
+                                            captioning = null
+                                            onSavePhoto(block)
+                                        },
                                         onRemove = {
                                             captioning = null
-                                            draft = EditorEdits.remove(draft, block.id)
-                                            lastEdit = System.currentTimeMillis()
-                                            onRemoveBlock(block.id)
+                                            removePhoto(block.id)
                                         },
                                     )
                                     is EssayBlock.SyncedScribble -> SyncedScribbleBlock(byId[block.scribbleId])
@@ -562,6 +582,13 @@ fun EssayEditor(
                 }
             }
         }
+        PhotoViewer(
+            photo = viewing?.let { id -> draft.blocks.firstOrNull { it.id == id } as? EssayBlock.Photo },
+            onDismiss = { viewing = null },
+            onCaption = { caption -> viewing?.let { setCaption(it, caption) } },
+            onSave = { (draft.blocks.firstOrNull { it.id == viewing } as? EssayBlock.Photo)?.let(onSavePhoto) },
+            onDelete = { viewing?.let(removePhoto) },
+        )
         OutlinePanel(
             open = outlineOpen,
             headings = headings,
@@ -591,7 +618,7 @@ fun EssayEditor(
 }
 
 /** Where the editor's tools start. Always closed in the app; the screenshot tests open a panel straight away. */
-data class EditorStart(val panel: ToolPanel = ToolPanel.None, val focus: String? = null, val styleTab: Boolean = false, val outline: Boolean = false)
+data class EditorStart(val panel: ToolPanel = ToolPanel.None, val focus: String? = null, val styleTab: Boolean = false, val outline: Boolean = false, val photo: String? = null)
 
 private enum class SideTab(val label: String) { Insert("插入"), Style("样式") }
 
@@ -936,7 +963,7 @@ private fun PlainField(value: String, placeholder: String, style: TextStyle, mod
 
 /**
  * A photo as it reads: just the picture, and its caption under it when it has one. A long press either
- * drags it ([pictureModifier]) or, let go in place, opens its menu: 配一句话 and 移除.
+ * drags it ([pictureModifier]) or, let go in place, opens its menu (PhotoMenuItems); a tap opens it full screen.
  */
 @Composable
 private fun PhotoBlock(
@@ -948,26 +975,18 @@ private fun PhotoBlock(
     onMenuDismiss: () -> Unit,
     onCaptionStart: () -> Unit,
     onCaption: (String) -> Unit,
+    onSave: () -> Unit,
     onRemove: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box {
             PictureView(block.picture, pictureModifier.fillMaxWidth().heightIn(min = 160.dp).height(220.dp).clip(RoundedCornerShape(24.dp)))
             DropdownMenu(menuOpen, onDismissRequest = onMenuDismiss) {
-                DropdownMenuItem(
-                    text = { Text(if (block.caption.isEmpty()) "配一句话" else "改配文") },
-                    leadingIcon = { Icon(Icons.Rounded.Edit, null) },
-                    onClick = onCaptionStart,
-                )
-                DropdownMenuItem(
-                    text = { Text("移除照片", color = MaterialTheme.colorScheme.error) },
-                    leadingIcon = { Icon(Icons.Rounded.HideImage, null, tint = MaterialTheme.colorScheme.error) },
-                    onClick = onRemove,
-                )
+                PhotoMenuItems(block.caption.isNotEmpty(), onCaption = onCaptionStart, onSave = onSave, onDelete = onRemove)
             }
         }
         AnimatedVisibility(captionOpen, enter = fadeIn(LeafMotion.tool()) + expandVertically(LeafMotion.expressive()), exit = fadeOut(LeafMotion.tool()) + shrinkVertically(LeafMotion.tool())) {
-            PlainField(block.caption, "配一句话", MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), captionModifier, onCaption)
+            PlainField(block.caption, "写一句标注", MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), captionModifier, onCaption)
         }
     }
 }

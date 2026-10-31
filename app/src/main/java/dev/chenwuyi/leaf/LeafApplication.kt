@@ -54,6 +54,8 @@ class AppContainer(context: Context) {
         importPhoto = photos::import,
         loadBody = sync::loadBody,
         freshFileUrl = sync::fileUrl,
+        readPhoto = photos::read,
+        downloadPhoto = photos::download,
     )
 
     init {
