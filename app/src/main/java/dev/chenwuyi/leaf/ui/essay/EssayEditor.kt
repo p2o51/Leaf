@@ -23,6 +23,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +65,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Audiotrack
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.DragIndicator
@@ -71,7 +77,6 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.HideImage
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -174,6 +179,8 @@ fun EssayEditor(
     onMoveBlock: (blockId: String, toIndex: Int) -> Unit = { _, _ -> },
     onCover: (Picture?) -> Unit = {},
     start: EditorStart = EditorStart(),
+    onOpenFile: (EssayBlock.Attachment) -> Unit = {},
+    onSavePhoto: (EssayBlock.Photo) -> Unit = {},
 ) {
     // Typing goes to a local draft first: waiting for Room's round trip would drop fast keystrokes.
     var draft by remember(essay.id) { mutableStateOf(essay) }
@@ -203,6 +210,17 @@ fun EssayEditor(
     var picking by remember { mutableStateOf(false) }
     var outlineOpen by remember { mutableStateOf(start.outline) }
     var captioning by remember(essay.id) { mutableStateOf<String?>(null) }
+    // The photo open full screen, by block id.
+    var viewing by remember(essay.id) { mutableStateOf(start.photo) }
+    val setCaption = { id: String, caption: String ->
+        edit(draft.copy(blocks = draft.blocks.map { if (it.id == id && it is EssayBlock.Photo) it.copy(caption = caption.replace("\n", "")) else it }))
+    }
+    val removePhoto = { id: String ->
+        if (viewing == id) viewing = null
+        draft = EditorEdits.remove(draft, id)
+        lastEdit = System.currentTimeMillis()
+        onRemoveBlock(id)
+    }
     val keyboard = LocalSoftwareKeyboardController.current
     val keyboardUp = WindowInsets.isImeVisible
     val haptics = LocalHapticFeedback.current
@@ -408,22 +426,31 @@ fun EssayEditor(
                                         block,
                                         captionOpen = captioning == block.id || block.caption.isNotEmpty(),
                                         menuOpen = captioning == MenuFor + block.id,
-                                        pictureModifier = longPressDrag,
+                                        pictureModifier = longPressDrag.pointerInput(block.id) {
+                                            // Only a short tap opens it: a held press belongs to the drag and the menu.
+                                            detectTapGestures(onPress = {
+                                                val at = System.currentTimeMillis()
+                                                if (tryAwaitRelease() && System.currentTimeMillis() - at < viewConfiguration.longPressTimeoutMillis) viewing = block.id
+                                            })
+                                        },
                                         captionModifier = track,
                                         onMenuDismiss = { captioning = null },
                                         onCaptionStart = {
                                             captioning = block.id
                                             focusNext = block.id
                                         },
-                                        onCaption = { caption -> edit(draft.copy(blocks = draft.blocks.map { if (it.id == block.id) block.copy(caption = caption.replace("\n", "")) else it })) },
+                                        onCaption = { caption -> setCaption(block.id, caption) },
+                                        onSave = {
+                                            captioning = null
+                                            onSavePhoto(block)
+                                        },
                                         onRemove = {
                                             captioning = null
-                                            draft = EditorEdits.remove(draft, block.id)
-                                            lastEdit = System.currentTimeMillis()
-                                            onRemoveBlock(block.id)
+                                            removePhoto(block.id)
                                         },
                                     )
                                     is EssayBlock.SyncedScribble -> SyncedScribbleBlock(byId[block.scribbleId])
+                                    is EssayBlock.Attachment -> AttachmentBlock(block) { onOpenFile(block) }
                                     is EssayBlock.Other -> when (block.type) {
                                         EssayBlock.Divider -> HorizontalDivider(
                                             longPressDrag.fillMaxWidth().padding(vertical = 14.dp),
@@ -555,6 +582,13 @@ fun EssayEditor(
                 }
             }
         }
+        PhotoViewer(
+            photo = viewing?.let { id -> draft.blocks.firstOrNull { it.id == id } as? EssayBlock.Photo },
+            onDismiss = { viewing = null },
+            onCaption = { caption -> viewing?.let { setCaption(it, caption) } },
+            onSave = { (draft.blocks.firstOrNull { it.id == viewing } as? EssayBlock.Photo)?.let(onSavePhoto) },
+            onDelete = { viewing?.let(removePhoto) },
+        )
         OutlinePanel(
             open = outlineOpen,
             headings = headings,
@@ -584,7 +618,7 @@ fun EssayEditor(
 }
 
 /** Where the editor's tools start. Always closed in the app; the screenshot tests open a panel straight away. */
-data class EditorStart(val panel: ToolPanel = ToolPanel.None, val focus: String? = null, val styleTab: Boolean = false, val outline: Boolean = false)
+data class EditorStart(val panel: ToolPanel = ToolPanel.None, val focus: String? = null, val styleTab: Boolean = false, val outline: Boolean = false, val photo: String? = null)
 
 private enum class SideTab(val label: String) { Insert("插入"), Style("样式") }
 
@@ -929,7 +963,7 @@ private fun PlainField(value: String, placeholder: String, style: TextStyle, mod
 
 /**
  * A photo as it reads: just the picture, and its caption under it when it has one. A long press either
- * drags it ([pictureModifier]) or, let go in place, opens its menu: 配一句话 and 移除.
+ * drags it ([pictureModifier]) or, let go in place, opens its menu (PhotoMenuItems); a tap opens it full screen.
  */
 @Composable
 private fun PhotoBlock(
@@ -941,26 +975,18 @@ private fun PhotoBlock(
     onMenuDismiss: () -> Unit,
     onCaptionStart: () -> Unit,
     onCaption: (String) -> Unit,
+    onSave: () -> Unit,
     onRemove: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box {
             PictureView(block.picture, pictureModifier.fillMaxWidth().heightIn(min = 160.dp).height(220.dp).clip(RoundedCornerShape(24.dp)))
             DropdownMenu(menuOpen, onDismissRequest = onMenuDismiss) {
-                DropdownMenuItem(
-                    text = { Text(if (block.caption.isEmpty()) "配一句话" else "改配文") },
-                    leadingIcon = { Icon(Icons.Rounded.Edit, null) },
-                    onClick = onCaptionStart,
-                )
-                DropdownMenuItem(
-                    text = { Text("移除照片", color = MaterialTheme.colorScheme.error) },
-                    leadingIcon = { Icon(Icons.Rounded.HideImage, null, tint = MaterialTheme.colorScheme.error) },
-                    onClick = onRemove,
-                )
+                PhotoMenuItems(block.caption.isNotEmpty(), onCaption = onCaptionStart, onSave = onSave, onDelete = onRemove)
             }
         }
         AnimatedVisibility(captionOpen, enter = fadeIn(LeafMotion.tool()) + expandVertically(LeafMotion.expressive()), exit = fadeOut(LeafMotion.tool()) + shrinkVertically(LeafMotion.tool())) {
-            PlainField(block.caption, "配一句话", MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), captionModifier, onCaption)
+            PlainField(block.caption, "写一句标注", MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), captionModifier, onCaption)
         }
     }
 }
@@ -1011,6 +1037,45 @@ private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: 
 }
 
 /** A synced block renders from the live scribble: recolour or edit it on the wall and it changes here too. */
+/** A Notion file, PDF, video or audio block: its name and kind; a tap opens it in whatever app handles it. */
+@Composable
+private fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
+    val icon = when (block.type) {
+        "pdf" -> Icons.Rounded.PictureAsPdf
+        "video" -> Icons.Rounded.Movie
+        "audio" -> Icons.Rounded.Audiotrack
+        else -> Icons.Rounded.Description
+    }
+    val kind = when (block.type) {
+        "pdf" -> "PDF"
+        "video" -> "视频"
+        "audio" -> "音频"
+        else -> block.name.substringAfterLast('.', "").takeIf { it.isNotEmpty() && it.length <= 5 && it != block.name }?.uppercase() ?: "文件"
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+        }
+        Column(Modifier.weight(1f)) {
+            Text(block.name.ifBlank { "附件" }, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(kind, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.AutoMirrored.Rounded.OpenInNew, "打开", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 @Composable
 private fun SyncedScribbleBlock(scribble: Scribble?) {
     val tones = LocalNotionTones.current

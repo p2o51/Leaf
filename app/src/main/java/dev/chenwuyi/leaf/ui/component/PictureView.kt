@@ -15,10 +15,10 @@ import dev.chenwuyi.leaf.data.SampleArt
 
 /** Draws a cover or a photo scribble. Sample art is painted, so demo data needs no image files. */
 @Composable
-fun PictureView(picture: Picture, modifier: Modifier = Modifier) {
+fun PictureView(picture: Picture, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Crop) {
     when (picture) {
-        is Picture.Local -> AsyncImage(model = picture.uri, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
-        is Picture.Remote -> AsyncImage(model = picture.url, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
+        is Picture.Local -> AsyncImage(model = picture.uri, contentDescription = null, modifier = modifier, contentScale = contentScale)
+        is Picture.Remote -> AsyncImage(model = picture.url, contentDescription = null, modifier = modifier, contentScale = contentScale)
         is Picture.Sample -> SampleArtView(picture.art, modifier)
     }
 }

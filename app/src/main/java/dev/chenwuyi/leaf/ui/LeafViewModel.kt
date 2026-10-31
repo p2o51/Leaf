@@ -2,6 +2,7 @@ package dev.chenwuyi.leaf.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.LeafRepository
@@ -139,6 +140,14 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
     }
 
     fun closeEssay() = openEssayState.update { null }
+
+    /** The photo's bytes for saving to the gallery; null when it cannot be had (offline, sample art). */
+    suspend fun photoBytes(block: EssayBlock.Photo): ByteArray? = repository.photoBytes(block.id)
+
+    /** Opens an attached file with whatever app handles it, using a freshly signed Notion link. */
+    fun openFile(block: EssayBlock.Attachment, open: (String) -> Unit) {
+        viewModelScope.launch { (repository.fileUrl(block.id) ?: block.url)?.let(open) }
+    }
 
     fun updateEssay(essay: Essay) {
         viewModelScope.launch { repository.updateEssay(essay) }

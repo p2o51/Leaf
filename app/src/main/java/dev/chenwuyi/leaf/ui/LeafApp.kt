@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.PaneLayout
+import dev.chenwuyi.leaf.data.local.GallerySaver
 import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.paneLayout
 import dev.chenwuyi.leaf.ui.capture.Capture
@@ -113,6 +114,13 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
     var capture by rememberSaveable(stateSaver = CaptureSaver) { mutableStateOf<Capture?>(null) }
     val context = LocalContext.current
+    val openLink: (String) -> Unit = { url ->
+        // A file nobody can open (no app for its type) is not worth a crash; the card just does nothing.
+        try {
+            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (_: android.content.ActivityNotFoundException) {
+        }
+    }
     val voice = remember { VoiceSession(VoiceRecognizers.forScribbles(context), scope) }
     // Closing the sheet, or switching it to text or a photo, drops a take still recording.
     LaunchedEffect(capture) { if (capture != Capture.Voice) voice.cancel() }
@@ -261,6 +269,14 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                                 e, allScribbles, EditorSync(connection != null, syncStatus), vm::closeEssay, vm::updateEssay, { id -> vm.removeBlock(e.id, id) }, m,
                                                 onMoveBlock = { id, to -> vm.moveBlock(e.id, id, to) },
                                                 onCover = { cover -> vm.setCover(e.id, cover) },
+                                                onOpenFile = { file -> vm.openFile(file, openLink) },
+                                                onSavePhoto = { photo ->
+                                                    scope.launch {
+                                                        val saved = vm.photoBytes(photo)?.let { GallerySaver.save(context, it) } == true
+                                                        snackbar.currentSnackbarData?.dismiss()
+                                                        snackbar.showSnackbar(if (saved) "已存到相册" else "没存上，联网后再试")
+                                                    }
+                                                },
                                             )
                                         }
                                     },

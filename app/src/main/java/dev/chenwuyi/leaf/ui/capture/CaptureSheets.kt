@@ -202,10 +202,10 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, No
             if (isVoice && !live.isNullOrEmpty()) {
                 // What the system recognizer hears while held, after anything already in the field.
                 Text(joinTranscript(text, live), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else if (text.isEmpty()) {
+            } else if (text.isEmpty() && photo == null) {
+                // A photo needs no words: its field stays blank rather than asking for a caption.
                 Text(
                     when {
-                        photo != null -> "配一句话（可以不写）"
                         isVoice -> "说的话会出现在这里，可以改"
                         else -> "想到什么写什么"
                     },

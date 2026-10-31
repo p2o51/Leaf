@@ -70,6 +70,19 @@ object LeafSchema {
 object NotionJson {
     private val TagFieldNames = listOf(LeafSchema.Tags, "Tags", "Tag", "Labels", "Label")
 
+    /** Notion's file-like blocks: Leaf shows them as a card that opens the file, and leaves them as they are. */
+    val FILE_TYPES = setOf("file", "pdf", "video", "audio")
+
+    /** What to call an attached file: its name in Notion, else its caption, else the last part of its URL. */
+    fun fileName(value: JSONObject): String {
+        val name = value.optString("name").trim()
+        if (name.isNotEmpty()) return name
+        val caption = plain(value.optJSONArray("caption")).trim()
+        if (caption.isNotEmpty()) return caption
+        val url = fileUrl(value) ?: return ""
+        return java.net.URLDecoder.decode(url.substringBefore('?').substringAfterLast('/'), "UTF-8")
+    }
+
     val TEXT_TYPES = setOf("paragraph", "heading_1", "heading_2", "heading_3", "quote", "bulleted_list_item", "numbered_list_item", "to_do", "callout", "toggle")
 
     fun dataSource(json: JSONObject): DataSourceInfo {
@@ -146,9 +159,10 @@ object NotionJson {
         val text = when (type) {
             in TEXT_TYPES -> plain(value.optJSONArray("rich_text"))
             "image" -> plain(value.optJSONArray("caption"))
+            in FILE_TYPES -> fileName(value)
             else -> ""
         }
-        val image = if (type == "image") fileUrl(value) else null
+        val image = if (type == "image" || type in FILE_TYPES) fileUrl(value) else null
         val fixed = type in TEXT_TYPES && (block.optBoolean("has_children") || type == "callout" || type == "toggle" ||
             value.optBoolean("is_toggleable") || value.optBoolean("checked") || !isPlain(value.optJSONArray("rich_text")))
         return RemoteBlock(block.getString("id"), type, text, NotionColor.fromApi(value.optString("color")), image, fixed)
