@@ -103,4 +103,15 @@ class NotionJsonTest {
         assertTrue(block("to_do", JSONObject().put("rich_text", words("买菜")).put("checked", true)).fixed)
         assertTrue(block("callout", JSONObject().put("rich_text", words("提示"))).fixed)
     }
+
+    @Test
+    fun should_read_a_file_blocks_name_and_link_when_reading_a_body() {
+        fun file(type: String, value: JSONObject) = NotionJson.bodyBlock(JSONObject().put("object", "block").put("id", "f").put("type", type).put(type, value))!!
+        val named = file("file", JSONObject().put("type", "file").put("name", "简历.pdf").put("file", JSONObject().put("url", "https://files.notion/a?sig=1")))
+        assertEquals("简历.pdf", named.text)
+        assertEquals("https://files.notion/a?sig=1", named.imageUrl)
+        val bare = file("pdf", JSONObject().put("type", "external").put("external", JSONObject().put("url", "https://example.com/papers/My%20Paper.pdf?x=1")))
+        assertEquals("My Paper.pdf", bare.text)
+        assertFalse(bare.fixed)
+    }
 }

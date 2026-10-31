@@ -26,6 +26,8 @@ interface LeafRepository {
     suspend fun copyToEssay(scribbleIds: Set<String>, essayId: String?): String
     /** Fetches an essay's body from Notion when it is not loaded yet (no-op when offline or unconnected). */
     suspend fun loadEssayBody(essayId: String) {}
+    /** A fresh link to an attached file (Notion's signed URLs expire after an hour); null when unreachable. */
+    suspend fun fileUrl(blockId: String): String? = null
 
     suspend fun removeBlocks(essayId: String, blockIds: Set<String>)
 
@@ -128,6 +130,6 @@ object BlockOrder {
         is EssayBlock.Paragraph -> !block.fixed
         is EssayBlock.Photo -> true
         is EssayBlock.Other -> block.type == EssayBlock.Divider
-        is EssayBlock.SyncedScribble -> false
+        is EssayBlock.SyncedScribble, is EssayBlock.Attachment -> false
     }
 }

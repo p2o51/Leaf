@@ -311,6 +311,13 @@ class SyncEngine(
         }
     }
 
+    /** Notion's current link to a file or image block, signed afresh; null when offline or unconnected. */
+    suspend fun fileUrl(blockId: String): String? {
+        store.connection.value ?: return null
+        val token = store.token() ?: return null
+        return try { auth.withToken(token) { notion.block(it, blockId) }?.imageUrl } catch (_: java.io.IOException) { null }
+    }
+
     /** Loads one essay's body unless it is loaded already or has edits still waiting to go out. */
     suspend fun loadBody(essayId: String): Unit = mutex.withLock {
         val c = store.connection.value ?: return@withLock

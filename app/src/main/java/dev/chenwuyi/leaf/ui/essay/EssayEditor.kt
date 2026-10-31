@@ -64,6 +64,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Audiotrack
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.DragIndicator
@@ -174,6 +179,7 @@ fun EssayEditor(
     onMoveBlock: (blockId: String, toIndex: Int) -> Unit = { _, _ -> },
     onCover: (Picture?) -> Unit = {},
     start: EditorStart = EditorStart(),
+    onOpenFile: (EssayBlock.Attachment) -> Unit = {},
 ) {
     // Typing goes to a local draft first: waiting for Room's round trip would drop fast keystrokes.
     var draft by remember(essay.id) { mutableStateOf(essay) }
@@ -424,6 +430,7 @@ fun EssayEditor(
                                         },
                                     )
                                     is EssayBlock.SyncedScribble -> SyncedScribbleBlock(byId[block.scribbleId])
+                                    is EssayBlock.Attachment -> AttachmentBlock(block) { onOpenFile(block) }
                                     is EssayBlock.Other -> when (block.type) {
                                         EssayBlock.Divider -> HorizontalDivider(
                                             longPressDrag.fillMaxWidth().padding(vertical = 14.dp),
@@ -1011,6 +1018,45 @@ private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: 
 }
 
 /** A synced block renders from the live scribble: recolour or edit it on the wall and it changes here too. */
+/** A Notion file, PDF, video or audio block: its name and kind; a tap opens it in whatever app handles it. */
+@Composable
+private fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
+    val icon = when (block.type) {
+        "pdf" -> Icons.Rounded.PictureAsPdf
+        "video" -> Icons.Rounded.Movie
+        "audio" -> Icons.Rounded.Audiotrack
+        else -> Icons.Rounded.Description
+    }
+    val kind = when (block.type) {
+        "pdf" -> "PDF"
+        "video" -> "视频"
+        "audio" -> "音频"
+        else -> block.name.substringAfterLast('.', "").takeIf { it.isNotEmpty() && it.length <= 5 && it != block.name }?.uppercase() ?: "文件"
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+        }
+        Column(Modifier.weight(1f)) {
+            Text(block.name.ifBlank { "附件" }, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(kind, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.AutoMirrored.Rounded.OpenInNew, "打开", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 @Composable
 private fun SyncedScribbleBlock(scribble: Scribble?) {
     val tones = LocalNotionTones.current

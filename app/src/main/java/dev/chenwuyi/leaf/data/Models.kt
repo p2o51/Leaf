@@ -67,6 +67,9 @@ sealed interface EssayBlock {
     data class SyncedScribble(override val id: String, val scribbleId: String) : EssayBlock
 
     /** An image block; [caption] is Notion's image caption. */
+    /** A Notion file, PDF, video or audio block: shown as a card that opens it; Leaf does not edit it. */
+    data class Attachment(override val id: String, val type: String, val name: String, val url: String?) : EssayBlock
+
     data class Photo(override val id: String, val picture: Picture, val caption: String = "") : EssayBlock
 
     companion object {

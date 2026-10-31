@@ -29,6 +29,7 @@ class RoomLeafRepository(
     private val requestSync: () -> Unit,
     private val importPhoto: (String) -> String? = { it },
     private val loadBody: suspend (essayId: String) -> Unit = {},
+    private val freshFileUrl: suspend (notionBlockId: String) -> String? = { null },
     private val clock: () -> Instant = Instant::now,
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) : LeafRepository {
@@ -180,6 +181,11 @@ class RoomLeafRepository(
     }
 
     override suspend fun loadEssayBody(essayId: String) = loadBody(essayId)
+
+    override suspend fun fileUrl(blockId: String): String? {
+        val row = dao.block(blockId) ?: return null
+        return row.blockId?.let { freshFileUrl(it) } ?: row.photo
+    }
 
     /**
      * A photo picked into an essay arrives as a content URI; keep a copy, like a scribble's. The editor

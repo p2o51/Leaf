@@ -113,6 +113,13 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
     var capture by rememberSaveable(stateSaver = CaptureSaver) { mutableStateOf<Capture?>(null) }
     val context = LocalContext.current
+    val openLink: (String) -> Unit = { url ->
+        // A file nobody can open (no app for its type) is not worth a crash; the card just does nothing.
+        try {
+            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (_: android.content.ActivityNotFoundException) {
+        }
+    }
     val voice = remember { VoiceSession(VoiceRecognizers.forScribbles(context), scope) }
     // Closing the sheet, or switching it to text or a photo, drops a take still recording.
     LaunchedEffect(capture) { if (capture != Capture.Voice) voice.cancel() }
@@ -261,6 +268,7 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                                 e, allScribbles, EditorSync(connection != null, syncStatus), vm::closeEssay, vm::updateEssay, { id -> vm.removeBlock(e.id, id) }, m,
                                                 onMoveBlock = { id, to -> vm.moveBlock(e.id, id, to) },
                                                 onCover = { cover -> vm.setCover(e.id, cover) },
+                                                onOpenFile = { file -> vm.openFile(file, openLink) },
                                             )
                                         }
                                     },

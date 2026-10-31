@@ -205,7 +205,7 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, No
             } else if (text.isEmpty()) {
                 Text(
                     when {
-                        photo != null -> "配一句话（可以不写）"
+                        photo != null -> "配一句话"
                         isVoice -> "说的话会出现在这里，可以改"
                         else -> "想到什么写什么"
                     },
