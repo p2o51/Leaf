@@ -230,6 +230,13 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                                 vm.openWall(null, emptySet())
                                             }
                                         },
+                                        onOpenSettings = {
+                                            // Same order as the wall: the drawer closes first, then the page comes in.
+                                            scope.launch {
+                                                drawer.close()
+                                                settingsOpen = true
+                                            }
+                                        },
                                     )
                                 },
                             ) {
@@ -244,7 +251,7 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                                     if (id != null && shownScribbles.none { it.id == id }) vm.setFilter(HomeFilter.All)
                                                     vm.openWall(id, near)
                                                 },
-                                                vm::openEssay, { settingsOpen = true }, { scope.launch { drawer.open() } },
+                                                vm::openEssay, { scope.launch { drawer.open() } },
                                                 Modifier.fillMaxSize(),
                                                 actions = essayActions,
                                             )

@@ -119,7 +119,7 @@ class PolishScreenshots {
     @Config(qualifiers = "w411dp-h891dp-xhdpi")
     fun home_without_scribbles() = shoot("polish-9-home-no-scribbles") {
         LeafTheme {
-            HomePane(emptyList(), SampleData.essays, HomeFilter.All, emptyList(), SampleData.essays, null, { _, _ -> }, {}, {}, {})
+            HomePane(emptyList(), SampleData.essays, HomeFilter.All, emptyList(), SampleData.essays, null, { _, _ -> }, {}, {})
         }
     }
 

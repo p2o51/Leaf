@@ -1,7 +1,6 @@
 package dev.chenwuyi.leaf.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,7 +37,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
@@ -46,7 +44,6 @@ import androidx.compose.material3.SearchBarState
 import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSearchBarState
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -92,7 +89,6 @@ fun HomePane(
     activeEssayId: String?,
     onOpenWall: (focusId: String?, near: Set<String>) -> Unit,
     onOpenEssay: (String) -> Unit,
-    onOpenSettings: () -> Unit,
     onOpenDrawer: () -> Unit,
     modifier: Modifier = Modifier,
     actions: EssayActions = EssayActions(),
@@ -105,7 +101,7 @@ fun HomePane(
         snapshotFlow { bar.currentValue }.collect { if (it == SearchBarValue.Collapsed) text.setTextAndPlaceCursorAtEnd("") }
     }
     val sorted = WallRules.searchEssays(essays, "")
-    val inputField: @Composable () -> Unit = { SearchField(text, bar, onOpenSettings, onOpenDrawer) }
+    val inputField: @Composable () -> Unit = { SearchField(text, bar, onOpenDrawer) }
 
     BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.surface)) {
         val columns = when {
@@ -182,10 +178,13 @@ fun HomePane(
     }
 }
 
-/** M3's input field. Collapsed it carries Leaf's mark (settings) at the end; open, the magnifier turns into back. */
+/**
+ * M3's input field. Collapsed, its end is left empty: settings moved into the drawer, and a mark there
+ * read as a button. Open, the menu key turns into back.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenSettings: () -> Unit, onOpenDrawer: () -> Unit) {
+private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenDrawer: () -> Unit) {
     val scope = rememberCoroutineScope()
     val expanded = bar.targetValue == SearchBarValue.Expanded
     val turn by animateFloatAsState(if (expanded) 1f else 0f, LeafMotion.fast(), label = "lead")
@@ -203,19 +202,10 @@ private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenSetting
                 }
             }
         },
-        trailingIcon = {
-            if (expanded) {
-                if (text.text.isNotEmpty()) IconButton(onClick = { text.setTextAndPlaceCursorAtEnd("") }) { Icon(painterResource(R.drawable.ic_sym_close), "清空") }
-            } else {
-                // Leaf's mark, the cookie shape, where an avatar would sit. Settings open from here.
-                Box(
-                    Modifier.padding(end = 4.dp).size(34.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable(onClickLabel = "设置", onClick = onOpenSettings),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("L", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-            }
+        trailingIcon = if (expanded) {
+            { if (text.text.isNotEmpty()) IconButton(onClick = { text.setTextAndPlaceCursorAtEnd("") }) { Icon(painterResource(R.drawable.ic_sym_close), "清空") } }
+        } else {
+            null
         },
     )
 }

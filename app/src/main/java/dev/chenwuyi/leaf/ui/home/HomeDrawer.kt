@@ -1,12 +1,10 @@
 package dev.chenwuyi.leaf.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,7 +13,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
@@ -37,8 +34,12 @@ import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
 
 /**
- * Keep's drawer, in Leaf's colours: everything and the wall, then the colors in use, then the tags in use.
- * No counts, no hints; a group with nothing in it is left out. The sheet itself follows the back gesture.
+ * Keep's drawer, in Leaf's colours: everything and the wall, then the colors in use, then the tags in use,
+ * and 设置 at the foot. No counts, no hints; a group with nothing in it is left out. The sheet itself
+ * follows the back gesture.
+ *
+ * Settings live here rather than behind the small mark in the search bar (51, 2026-11-01): the bar's
+ * mark read as an avatar, and the drawer is where Leaf's other places already are.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -49,9 +50,11 @@ fun HomeDrawer(
     tags: List<String>,
     onPick: (HomeFilter) -> Unit,
     onOpenWall: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
-    ModalDrawerSheet(drawerState = state) {
-        Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
+    // Paperleaf: a panel sits on paper-container, flat.
+    ModalDrawerSheet(drawerState = state, drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
             Row(Modifier.padding(start = 16.dp, top = 20.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.size(32.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(MaterialTheme.colorScheme.primaryContainer),
@@ -65,7 +68,7 @@ fun HomeDrawer(
             // Unfiltered home is the drawer's "home"; its selected state takes the filled twin.
             val all = filter == HomeFilter.All
             Item("全部", all, { Icon(painterResource(if (all) R.drawable.ic_sym_home_filled else R.drawable.ic_sym_home), null) }) { onPick(HomeFilter.All) }
-            Item("涂鸦墙", false, { Icon(painterResource(R.drawable.ic_sym_wall), null) }, onOpenWall)
+            Item("涂鸦墙", false, { Icon(painterResource(R.drawable.ic_sym_wall), null) }, onClick = onOpenWall)
             if (colors.isNotEmpty()) {
                 Group("颜色")
                 val tones = LocalNotionTones.current
@@ -83,24 +86,29 @@ fun HomeDrawer(
             }
             Spacer(Modifier.height(16.dp))
         }
-    }
-}
-
-@Composable
-private fun Item(label: String, selected: Boolean, icon: @Composable () -> Unit, onClick: () -> Unit) {
-    NavigationDrawerItem(label = { Text(label) }, selected = selected, onClick = onClick, icon = icon, modifier = Modifier.height(52.dp))
-}
-
-/** A divider and a small heading, the 24dp break between groups. */
-@Composable
-private fun Group(title: String) {
-    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-        Text(
-            title,
-            Modifier.padding(start = 16.dp, bottom = 4.dp).semantics { heading() },
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // Pinned under the list, so a long tag list never pushes it out of reach.
+        Item(
+            "设置",
+            false,
+            { Icon(painterResource(R.drawable.ic_sym_settings), null) },
+            Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp),
+            onClick = onOpenSettings,
         )
     }
+}
+
+@Composable
+private fun Item(label: String, selected: Boolean, icon: @Composable () -> Unit, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    NavigationDrawerItem(label = { Text(label) }, selected = selected, onClick = onClick, icon = icon, modifier = modifier.height(52.dp))
+}
+
+/** The 24dp break between groups and a title-s heading; Paperleaf groups by space, not by rules. */
+@Composable
+private fun Group(title: String) {
+    Text(
+        title,
+        Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp).semantics { heading() },
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
