@@ -1,6 +1,7 @@
 package dev.chenwuyi.leaf.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,12 +26,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.NotionColor
+import dev.chenwuyi.leaf.ui.component.scrollEdgeFade
 import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
 
 /**
@@ -39,7 +43,9 @@ import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
  * follows the back gesture.
  *
  * Settings live here rather than behind the small mark in the search bar (51, 2026-11-01): the bar's
- * mark read as an avatar, and the drawer is where Leaf's other places already are.
+ * mark read as an avatar, and the drawer is where Leaf's other places already are. The Leaf mark at the
+ * top opens them too, since that is where people look for an app's settings first; the tag list fades
+ * out above the pinned 设置 rather than being cut through.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -54,13 +60,22 @@ fun HomeDrawer(
 ) {
     // Paperleaf: a panel sits on paper-container, flat.
     ModalDrawerSheet(drawerState = state, drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
-            Row(Modifier.padding(start = 16.dp, top = 20.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        val scroll = rememberScrollState()
+        Column(Modifier.weight(1f).scrollEdgeFade(scroll).verticalScroll(scroll).padding(horizontal = 12.dp)) {
+            Row(
+                Modifier
+                    .padding(top = 12.dp, bottom = 8.dp)
+                    .clip(CircleShape)
+                    .clickable(onClickLabel = "打开设置", role = Role.Button, onClick = onOpenSettings)
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Box(
                     Modifier.size(32.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("L", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    // The mark is decoration; the row reads as "Leaf", which opens settings.
+                    Text("L", Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
                 Spacer(Modifier.size(12.dp))
                 Text("Leaf", style = MaterialTheme.typography.titleLarge)

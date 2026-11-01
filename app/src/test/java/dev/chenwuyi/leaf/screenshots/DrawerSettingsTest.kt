@@ -81,6 +81,38 @@ class DrawerSettingsTest {
         assertTrue("home has no settings entry of its own: $offending", offending.isEmpty())
     }
 
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun should_open_settings_when_the_leaf_mark_at_the_drawer_top_is_tapped() {
+        var opened = 0
+        val activity = show("home-phone-10-drawer-mark") { drawer(tags = listOf("东京")) { opened++ } }
+        val header = nodes(activity).single { it.config.getOrNull(SemanticsActions.OnClick)?.label == "打开设置" }
+        assertTrue("the mark's row reads as Leaf", header.hasText("Leaf"))
+        header.config.getOrNull(SemanticsActions.OnClick)!!.action!!.invoke()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, opened)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun should_say_categories_and_settings_when_the_menu_key_is_read_out() {
+        val activity = show("home-phone-11-menu-key") {
+            LeafTheme {
+                HomePane(SampleData.scribbles, SampleData.essays, HomeFilter.All, SampleData.scribbles, SampleData.essays, null, { _, _ -> }, {}, {})
+            }
+        }
+        val described = nodes(activity).flatMap { it.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() }
+        assertTrue("menu key: $described", "分类和设置" in described)
+        assertTrue("the old name is gone: $described", "分类" !in described)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h560dp-night-xhdpi")
+    fun should_draw_the_tag_list_fading_above_settings_when_it_overflows_a_dark_drawer() {
+        // A picture only: the fade over the last tag rows above the pinned 设置, in dark paper.
+        show("home-phone-12-drawer-short-dark") { drawer(tags = (1..24).map { "标签$it" }) {} }
+    }
+
     @Composable
     private fun drawer(tags: List<String>, onOpenSettings: () -> Unit) = LeafTheme {
         val state = rememberDrawerState(DrawerValue.Open)

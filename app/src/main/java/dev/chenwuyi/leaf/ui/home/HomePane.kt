@@ -199,10 +199,11 @@ private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenDrawer:
         onSearch = {},
         placeholder = { Text("搜索随笔和涂鸦") },
         leadingIcon = {
-            // Collapsed, the leading icon opens the drawer, as in Keep; open, it turns into back.
+            // Collapsed, the leading icon opens the drawer, as in Keep; open, it turns into back. The drawer
+            // holds settings as well as the colours and tags, so its key says both.
             IconButton(onClick = { if (expanded) scope.launch { bar.animateToCollapsed() } else onOpenDrawer() }) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(painterResource(R.drawable.ic_sym_menu), if (expanded) null else "分类", Modifier.graphicsLayer { alpha = 1f - turn; rotationZ = 90f * turn })
+                    Icon(painterResource(R.drawable.ic_sym_menu), if (expanded) null else "分类和设置", Modifier.graphicsLayer { alpha = 1f - turn; rotationZ = 90f * turn })
                     Icon(painterResource(R.drawable.ic_sym_back), if (expanded) "关闭搜索" else null, Modifier.graphicsLayer { alpha = turn; rotationZ = -90f * (1f - turn) })
                 }
             }
