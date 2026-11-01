@@ -45,6 +45,10 @@ internal fun probeRoots(activity: ComponentActivity): List<ViewRootForTest> {
 internal fun semanticsNodes(activity: ComponentActivity): List<SemanticsNode> =
     probeRoots(activity).flatMap { it.semanticsOwner.rootSemanticsNode.allNodes() }
 
+/** Every node, unmerged: text inside a merged parent (a card, a sheet) shows here on its own. */
+internal fun unmergedNodes(activity: ComponentActivity): List<SemanticsNode> =
+    probeRoots(activity).flatMap { it.semanticsOwner.unmergedRootSemanticsNode.allNodes() }
+
 private fun SemanticsNode.allNodes(): List<SemanticsNode> = listOf(this) + children.flatMap { it.allNodes() }
 
 internal fun SemanticsNode.texts(): List<String> = config.getOrNull(SemanticsProperties.Text)?.map { it.text }.orEmpty()

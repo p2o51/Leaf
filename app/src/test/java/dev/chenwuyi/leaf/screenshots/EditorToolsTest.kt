@@ -44,8 +44,10 @@ class EditorToolsTest {
         val aa = semanticsNodes(activity).single { "样式" in it.descriptions() }
         assertFalse("样式 is not greyed out", aa.config.contains(SemanticsProperties.Disabled))
         aa.tap()
-        val texts = semanticsNodes(activity).flatMap { it.texts() }
-        assertTrue("the hint shows: $texts", "点一下正文里的一段，再来改它的样式" in texts)
+        settleFrames()
+        val texts = unmergedNodes(activity).flatMap { it.texts() }
+        val styleOn = semanticsNodes(activity).single { "样式" in it.descriptions() }.config.getOrNull(SemanticsProperties.Selected)
+        assertTrue("the hint shows (样式 selected=$styleOn): $texts", texts.any { "点一下正文里的一段" in it })
     }
 
     @Test
