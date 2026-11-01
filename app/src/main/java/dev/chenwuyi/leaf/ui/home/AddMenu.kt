@@ -2,6 +2,7 @@ package dev.chenwuyi.leaf.ui.home
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -74,7 +75,7 @@ fun AddMenu(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
-        AnimatedVisibility(expanded, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(expanded, enter = fadeIn(LeafMotion.effects()), exit = fadeOut(LeafMotion.effects())) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -90,8 +91,9 @@ fun AddMenu(
             AddKind.entries.forEachIndexed { index, kind ->
                 AnimatedVisibility(
                     expanded,
-                    enter = fadeIn() + scaleIn(LeafMotion.fast(), initialScale = 0.8f) + slideInVertically(LeafMotion.expressive()) { it / 2 * (AddKind.entries.size - index) },
-                    exit = fadeOut() + scaleOut(targetScale = 0.8f) + slideOutVertically { it / 2 },
+                    // Home is the lively zone: the pills spring in; every fade is on effects.
+                    enter = fadeIn(LeafMotion.effects()) + scaleIn(LeafMotion.livelyFast(), initialScale = 0.8f) + slideInVertically(LeafMotion.lively()) { it / 2 * (AddKind.entries.size - index) },
+                    exit = fadeOut(LeafMotion.effects()) + scaleOut(LeafMotion.livelyFast(), targetScale = 0.8f) + slideOutVertically(LeafMotion.lively()) { it / 2 },
                 ) {
                     MenuItem(kind) { onExpandedChange(false); onPick(kind) }
                 }
@@ -99,8 +101,10 @@ fun AddMenu(
             val haptics = LocalHapticFeedback.current
             val rotation by animateFloatAsState(if (expanded) 45f else 0f, LeafMotion.fast(), label = "plus")
             val corner by androidx.compose.animation.core.animateDpAsState(if (expanded) 38.dp else 26.dp, LeafMotion.fast(), label = "corner")
-            val container = if (expanded) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.tertiaryContainer
-            val content = if (expanded) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onTertiaryContainer
+            // The MD3E morph (round to rounded-square, a 45° turn) stays; the colour now blends on effects
+            // instead of swapping while the shape is still moving.
+            val container by animateColorAsState(if (expanded) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.tertiaryContainer, LeafMotion.effects(), label = "plus fill")
+            val content by animateColorAsState(if (expanded) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onTertiaryContainer, LeafMotion.effects(), label = "plus ink")
             Box(
                 Modifier
                     .padding(top = 4.dp)
