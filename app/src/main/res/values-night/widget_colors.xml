@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="widget_surface">#1A1F14</color>
-    <color name="widget_line">#282F21</color>
-    <color name="widget_on_surface">#E2E6D6</color>
-    <color name="widget_on_surface_variant">#C2C9B4</color>
-    <color name="widget_primary_container">#3E6B00</color>
-    <color name="widget_on_primary_container">#D9FF8F</color>
+    <color name="widget_surface">#1A1916</color>
+    <color name="widget_line">#2A2824</color>
+    <color name="widget_on_surface">#EAE6DD</color>
+    <color name="widget_on_surface_variant">#B3AEA3</color>
+    <color name="widget_primary_container">#225100</color>
+    <color name="widget_on_primary_container">#C7F2A4</color>
 </resources>
