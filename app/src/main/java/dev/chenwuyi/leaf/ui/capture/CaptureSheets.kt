@@ -75,9 +75,18 @@ sealed interface Capture {
 /** Paperleaf's PaperSheet: radius-xl on top, on paper-container, flat. */
 private val SheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
-/** One sheet for every way of adding a scribble: a line of text, a colour, and for photos the picture and a caption. */
+/**
+ * One sheet for every way of adding a scribble: a line of text, a colour, and for photos the picture and a
+ * caption. [hint] is a quiet line under the voice sheet's title (VoiceHint), null almost always.
+ */
 @Composable
-fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit) {
+fun CaptureSheet(
+    capture: Capture?,
+    voice: VoiceSession,
+    onDismiss: () -> Unit,
+    onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit,
+    hint: String? = null,
+) {
     // After 记下 the sheet stays a moment with a tick and 记下了, then slides away (Paw's SheetFinisher),
     // instead of vanishing the instant the scribble is saved. The scribble itself is saved at once.
     // [finishing] holds the sheet up for the pause; [done] keeps the tick shown through the slide away
@@ -119,7 +128,7 @@ fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, 
                 if (finished) {
                     SheetDone()
                 } else {
-                    SheetBody(shown, voice) { text, color, photo ->
+                    SheetBody(shown, voice, hint) { text, color, photo ->
                         finishing = true
                         done = true
                         onSave(text, color, photo)
@@ -159,7 +168,7 @@ private fun SheetDone() {
 }
 
 @Composable
-private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, NotionColor, Picture?) -> Unit) {
+private fun SheetBody(capture: Capture, voice: VoiceSession, hint: String?, onSave: (String, NotionColor, Picture?) -> Unit) {
     var text by rememberSaveable(capture) { mutableStateOf(capture.initial) }
     var color by rememberSaveable(capture) { mutableStateOf(NotionColor.Default) }
     val focus = remember { FocusRequester() }
@@ -189,12 +198,15 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, No
     ) {
         Text(
             when (capture) {
-                is Capture.Text -> "记一条涂鸦"
+                is Capture.Text -> "写一句"
                 Capture.Voice -> "说一句"
                 is Capture.Photo -> "这张照片记成涂鸦"
             },
             style = MaterialTheme.typography.titleMedium,
         )
+        if (isVoice && hint != null) {
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         if (photo != null) {
             PictureView(photo, Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(24.dp)))
         }

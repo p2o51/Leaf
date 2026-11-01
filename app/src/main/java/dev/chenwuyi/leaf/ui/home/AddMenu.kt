@@ -52,11 +52,12 @@ import dev.chenwuyi.leaf.ui.capture.holdToTalk
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 
 // No hint under the labels: menus carry no explanations (51's Do/Don't, 2026-10-24). The colour already
-// tells the scribbles (primary) from the essay (tertiary).
+// tells the scribbles (primary) from the essay (tertiary). The names are the ones the launcher shortcuts,
+// the widget and the quick settings tile use too, so each way in is called the same everywhere.
 enum class AddKind(val label: String, @DrawableRes val icon: Int) {
     Photo("拍照", R.drawable.ic_sym_photo_camera),
-    Voice("语音", R.drawable.ic_sym_mic),
-    Text("文本", R.drawable.ic_sym_short_text),
+    Voice("说一句", R.drawable.ic_sym_mic),
+    Text("写一句", R.drawable.ic_sym_short_text),
     Essay("随笔", R.drawable.ic_sym_essay),
 }
 
@@ -115,7 +116,7 @@ fun AddMenu(
                         role = Role.Button
                         onClick("新建") { onExpandedChange(!expanded); true }
                         // Without a finger to hold, a long press only opens the voice sheet; its mic does the rest.
-                        onLongClick("语音") { onExpandedChange(false); onPick(AddKind.Voice); true }
+                        onLongClick(AddKind.Voice.label) { onExpandedChange(false); onPick(AddKind.Voice); true }
                     }
                     // Keyboard and D-pad: the custom gesture below handles touch only, so Enter opens the menu.
                     .onKeyEvent { event ->

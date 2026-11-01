@@ -57,6 +57,7 @@ import dev.chenwuyi.leaf.data.PaneLayout
 import dev.chenwuyi.leaf.data.local.GallerySaver
 import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.paneLayout
+import dev.chenwuyi.leaf.data.settings.VoiceHint
 import dev.chenwuyi.leaf.ui.capture.Capture
 import dev.chenwuyi.leaf.ui.capture.CaptureSheet
 import dev.chenwuyi.leaf.ui.capture.VoiceSession
@@ -122,15 +123,26 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
         }
     }
     val voice = remember { VoiceSession(VoiceRecognizers.forScribbles(context), scope) }
+    val voiceHint = remember { VoiceHint(context) }
+    // Whether this voice sheet carries VoiceHint's line; only a sheet opened from the menu can.
+    var hintShown by rememberSaveable { mutableStateOf(false) }
     // Closing the sheet, or switching it to text or a photo, drops a take still recording.
-    LaunchedEffect(capture) { if (capture != Capture.Voice) voice.cancel() }
+    LaunchedEffect(capture) {
+        if (capture != Capture.Voice) {
+            voice.cancel()
+            hintShown = false
+        }
+    }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) capture = Capture.Photo(Picture.Local(uri.toString()))
     }
     val onAdd: (AddKind) -> Unit = { kind ->
         when (kind) {
             AddKind.Photo -> pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            AddKind.Voice -> capture = Capture.Voice
+            AddKind.Voice -> {
+                hintShown = voiceHint.pickedFromMenu()
+                capture = Capture.Voice
+            }
             AddKind.Text -> capture = Capture.Text()
             AddKind.Essay -> vm.newEssay()
         }
@@ -260,6 +272,8 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                                 { menuOpen = it },
                                                 onAdd,
                                                 onHoldStart = {
+                                                    voiceHint.heldToTalk()
+                                                    hintShown = false
                                                     capture = Capture.Voice
                                                     // Without the permission the sheet opens and its mic asks first.
                                                     if (context.canRecord()) voice.press()
@@ -303,6 +317,7 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
         CaptureSheet(
             capture,
             voice,
+            hint = if (hintShown) VoiceHint.Text else null,
             onDismiss = { capture = null },
             onSave = { text, color, photo ->
                 capture = null
