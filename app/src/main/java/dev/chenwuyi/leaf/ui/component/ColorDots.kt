@@ -29,7 +29,8 @@ import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
 /**
  * The ten Notion colours as dots. Each dot sits in its own 48dp touch target, so a thumb never lands on
  * the neighbour; the chosen one morphs from a circle into a rounded square inside an ink ring, which reads
- * on every fill (a tint over the dot did not on the pale ones).
+ * on every fill (a tint over the dot did not on the pale ones). 默认 is a hollow ring in outline, so it
+ * never passes for 灰.
  *
  * Ten 48dp targets do not fit one line of a phone's sheet, and seven over three looked like a mistake, so
  * they go [perRow] to a row: two even rows by default. A caller that scrolls the dots sideways passes the
@@ -39,6 +40,7 @@ import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
 fun ColorDots(selected: NotionColor?, onPick: (NotionColor) -> Unit, modifier: Modifier = Modifier, perRow: Int = 5) {
     val tones = LocalNotionTones.current
     val ink = MaterialTheme.colorScheme.onSurface
+    val outline = MaterialTheme.colorScheme.outline
     FlowRow(modifier, maxItemsInEachRow = perRow) {
         NotionColor.entries.forEach { c ->
             val on = c == selected
@@ -52,18 +54,26 @@ fun ColorDots(selected: NotionColor?, onPick: (NotionColor) -> Unit, modifier: M
                     .semantics { contentDescription = swatchLabel(c) },
                 contentAlignment = Alignment.Center,
             ) {
+                val dot = RoundedCornerShape(corner)
                 Box(
                     Modifier
                         .size(40.dp)
                         .border(2.dp, ring, RoundedCornerShape(corner + 5.dp))
                         .padding(5.dp)
-                        .clip(RoundedCornerShape(corner))
-                        .background(if (c == NotionColor.Default) MaterialTheme.colorScheme.surfaceContainerHighest else tones.fill(c)),
+                        .clip(dot)
+                        .then(
+                            // 默认 is the page's own colour, so it is drawn as no paint at all: a hollow ring.
+                            // Filled with a pale paper it read as one more grey beside 灰.
+                            if (c == NotionColor.Default) Modifier.border(DefaultRingWidth, outline, dot) else Modifier.background(tones.fill(c)),
+                        ),
                 )
             }
         }
     }
 }
+
+/** The 默认 dot's ring: thin enough to read as an empty dot, not as the picked one's ink ring (2dp). */
+internal val DefaultRingWidth = 1.5.dp
 
 /** What TalkBack says for a dot: the colour by name, and 默认 as what it is, the page's own colour. */
 internal fun swatchLabel(c: NotionColor): String = if (c == NotionColor.Default) "默认颜色" else "${c.label}色"

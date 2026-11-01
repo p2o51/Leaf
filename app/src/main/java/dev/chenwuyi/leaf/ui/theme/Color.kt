@@ -113,7 +113,8 @@ internal val LightTones = NotionTones(
 
 internal val DarkTones = NotionTones(
     fills = mapOf(
-        NotionColor.Gray to Color(0xFF3A3935),
+        // A step lighter than 0xFF3A3935, which all but vanished on the dark drawer and sheets (paper-container #211F1B).
+        NotionColor.Gray to Color(0xFF4A4843),
         NotionColor.Brown to Color(0xFF4A3528),
         NotionColor.Orange to Color(0xFF5A3A1E),
         NotionColor.Yellow to Color(0xFF4F4614),
