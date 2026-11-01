@@ -54,8 +54,9 @@ fun VoiceControls(voice: VoiceSession, canSave: Boolean, onSave: () -> Unit) {
     val state = voice.state
     val holding = state is VoiceState.Listening
     val line = when (state) {
-        // Before the microphone is granted the line says where the voice goes: that is consent, not chrome.
-        is VoiceState.Idle -> if (!context.canRecord() && state.line == VoiceCopy.Ready) VoiceCopy.permission(voice.route()) else state.line
+        // Without the microphone yet, the line stays 按住说: the system asks on the first hold, and the
+        // sheet no longer explains where the words go (round 2: settings and sheets carry no explanations).
+        is VoiceState.Idle -> state.line
         is VoiceState.Listening -> VoiceCopy.Holding
         is VoiceState.Finishing -> VoiceCopy.Finishing
         is VoiceState.Heard -> state.line

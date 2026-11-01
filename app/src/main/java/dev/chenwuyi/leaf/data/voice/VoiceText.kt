@@ -22,14 +22,6 @@ object VoiceCopy {
     const val Ready = "按住说，松开就转写"
     const val Holding = "在听，松开结束"
     const val Finishing = "转写中"
-    // Shown only before the microphone is granted, i.e. at the moment of consent: where the voice goes is
-    // a privacy fact the user needs then, not an explanation (kept through round 2's copy cuts).
-    fun permission(route: VoiceRoute): String = when (route) {
-        VoiceRoute.System -> "只在按住时收音，转写可能经过系统的联网服务"
-        VoiceRoute.Cloud -> "只在按住时收音，松开后发给 ElevenLabs 转写"
-        else -> "只在按住时收音，转写在这台设备上完成"
-    }
-
     const val Transcribed = "转写好了，可以改一改"
     const val HoldToTalk = "要按住说话，松开结束"
     const val Denied = "没有麦克风权限，先用打字"
