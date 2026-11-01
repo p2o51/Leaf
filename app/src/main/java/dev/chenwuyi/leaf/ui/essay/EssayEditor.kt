@@ -370,7 +370,9 @@ fun EssayEditor(
                                     clip = false
                                 }
                             } else {
-                                Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = LeafMotion.expressive())
+                                // Blocks re-flow (Enter splitting a paragraph, a neighbour swapping under a drag) in the
+                                // still tempo: no bounce under the text while writing.
+                                Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = LeafMotion.still())
                             }
                             // Photos and rules move on a long press; text keeps its long press for selecting words.
                             val longPressDrag = if (block is EssayBlock.Photo || (block is EssayBlock.Other && BlockOrder.movable(block))) {

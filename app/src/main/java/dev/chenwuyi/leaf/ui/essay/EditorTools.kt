@@ -106,10 +106,11 @@ fun EditorToolbar(
         }
         ToolButton(R.drawable.ic_sym_image, "插入照片", onClick = onPhoto)
         ToolButton(R.drawable.ic_sym_scribble, "插入涂鸦", onClick = onScribble)
-        // Grows out of the bar's end with the keyboard rather than popping in: the bar widens on the same spring.
+        // Grows out of the bar's end with the keyboard rather than popping in: the bar widens on the same spring,
+        // the still one, since this happens every time the keyboard rises mid-sentence.
         AnimatedVisibility(
             keyboardUp,
-            enter = expandHorizontally(LeafMotion.expressive(), expandFrom = Alignment.Start) + fadeIn(LeafMotion.tool()) + scaleIn(LeafMotion.expressive(), initialScale = 0.6f),
+            enter = expandHorizontally(LeafMotion.still(), expandFrom = Alignment.Start) + fadeIn(LeafMotion.tool()) + scaleIn(LeafMotion.still(), initialScale = 0.6f),
             exit = shrinkHorizontally(LeafMotion.tool(), shrinkTowards = Alignment.Start) + fadeOut(LeafMotion.tool()) + scaleOut(LeafMotion.tool(), targetScale = 0.6f),
         ) {
             ToolButton(R.drawable.ic_sym_keyboard_hide, "收起键盘", onClick = onHideKeyboard)
