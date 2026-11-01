@@ -85,8 +85,9 @@ class WallMenuTest {
         val field = global.getDeclaredField("mViews").apply { isAccessible = true }
         @Suppress("UNCHECKED_CAST")
         val own = activity.window.decorView
-        // Only this activity's popups: a popup window carries the token of the window it opened over.
-        val roots = (field.get(instance) as List<View>).toList().filter { it !== own && it.applicationWindowToken == own.applicationWindowToken }
+        // Every window but the activity's own: each test builds one activity, so the others are its popups
+        // (Robolectric does not always give a popup the token of the window it opened over).
+        val roots = (field.get(instance) as List<View>).toList().filter { it !== own }
         fun walk(v: View): List<View> = if (v is ViewGroup) listOf(v) + (0 until v.childCount).flatMap { walk(v.getChildAt(it)) } else listOf(v)
         fun SemanticsNode.all(): List<SemanticsNode> = listOf(this) + children.flatMap { it.all() }
         return roots.flatMap(::walk).filterIsInstance<ViewRootForTest>().flatMap { it.semanticsOwner.rootSemanticsNode.all() }
