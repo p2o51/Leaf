@@ -87,7 +87,7 @@ fun CaptureSheet(
     onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit,
     hint: String? = null,
 ) {
-    // After 记下 the sheet stays a moment with a tick and 记下了, then slides away (Paw's SheetFinisher),
+    // After 完成 the sheet stays a moment with a tick and 记下了, then slides away (Paw's SheetFinisher),
     // instead of vanishing the instant the scribble is saved. The scribble itself is saved at once.
     // [finishing] holds the sheet up for the pause; [done] keeps the tick shown through the slide away
     // too, so the form (which would take focus and bring the keyboard back) never returns as it leaves.
@@ -243,7 +243,7 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, hint: String?, onSa
             VoiceControls(voice, canSave, save)
         } else {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = save, enabled = canSave) { Text("记下") }
+                Button(onClick = save, enabled = canSave) { Text(ConfirmLabel) }
             }
         }
     }

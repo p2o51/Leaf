@@ -43,7 +43,7 @@ import dev.chenwuyi.leaf.ui.theme.LeafMotion
 fun Context.canRecord(): Boolean =
     ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-/** The voice sheet's bottom row: one quiet line, the big hold-to-talk mic, and 记下. */
+/** The voice sheet's bottom row: one quiet line, the big hold-to-talk mic, and 完成 (Sheaf's word for the same button). */
 @Composable
 fun VoiceControls(voice: VoiceSession, canSave: Boolean, onSave: () -> Unit) {
     val context = LocalContext.current
@@ -54,7 +54,9 @@ fun VoiceControls(voice: VoiceSession, canSave: Boolean, onSave: () -> Unit) {
     val state = voice.state
     val holding = state is VoiceState.Listening
     val line = when (state) {
-        is VoiceState.Idle -> if (!context.canRecord() && state.line == VoiceCopy.Ready) VoiceCopy.permission(voice.route()) else state.line
+        // Without the microphone yet, the line stays 按住说: the system asks on the first hold, and the
+        // sheet no longer explains where the words go (round 2: settings and sheets carry no explanations).
+        is VoiceState.Idle -> state.line
         is VoiceState.Listening -> VoiceCopy.Holding
         is VoiceState.Finishing -> VoiceCopy.Finishing
         is VoiceState.Heard -> state.line
@@ -98,8 +100,11 @@ fun VoiceControls(voice: VoiceSession, canSave: Boolean, onSave: () -> Unit) {
                 Icon(painterResource(R.drawable.ic_sym_mic), contentDescription = null, Modifier.size(38.dp), tint = content)
             }
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                Button(onClick = onSave, enabled = canSave && state !is VoiceState.Listening && state !is VoiceState.Finishing) { Text("记下") }
+                Button(onClick = onSave, enabled = canSave && state !is VoiceState.Listening && state !is VoiceState.Finishing) { Text(ConfirmLabel) }
             }
         }
     }
 }
+
+/** The capture sheet's confirm button, the same word as Sheaf's thought sheet; it stays on Leaf's own primary. */
+const val ConfirmLabel = "完成"

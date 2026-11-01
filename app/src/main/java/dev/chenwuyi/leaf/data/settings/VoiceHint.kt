@@ -25,7 +25,8 @@ class VoiceHint(context: Context) {
 
     companion object {
         const val PicksBeforeHint = 3
-        const val Text = "下次长按 + 直接说"
+        // In words, not "+": read aloud, or at a glance, the sign read as 和.
+        const val Text = "下次可以长按加号直接说"
         private const val KeyPicks = "voice_menu_picks"
         private const val KeyDone = "voice_hint_done"
     }
