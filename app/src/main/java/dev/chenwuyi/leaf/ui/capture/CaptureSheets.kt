@@ -72,6 +72,9 @@ sealed interface Capture {
     data class Photo(val picture: Picture, override val initial: String = "") : Capture
 }
 
+/** Paperleaf's PaperSheet: radius-xl on top, on paper-container, flat. */
+private val SheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+
 /** One sheet for every way of adding a scribble: a line of text, a colour, and for photos the picture and a caption. */
 @Composable
 fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit) {
@@ -94,7 +97,7 @@ fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, 
     }
     val visible = capture != null || finishing
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(visible, enter = fadeIn(LeafMotion.effects()), exit = fadeOut(LeafMotion.effects())) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).clickable(interactionSource = null, indication = null, onClick = onDismiss))
         }
         AnimatedVisibility(
@@ -138,8 +141,8 @@ private fun SheetDone() {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(SheetShape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .navigationBarsPadding()
             .padding(horizontal = 20.dp, vertical = 28.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
@@ -177,8 +180,8 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, No
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(SheetShape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .navigationBarsPadding()
             .imePadding()
             .padding(20.dp),
@@ -196,7 +199,8 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, No
             PictureView(photo, Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(24.dp)))
         }
         Box(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(horizontal = 18.dp, vertical = 14.dp),
+            // Paperleaf's filled field: paper-high, radius-s.
+            Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             val live = (voice.state as? VoiceState.Listening)?.text ?: (voice.state as? VoiceState.Finishing)?.text
             if (isVoice && !live.isNullOrEmpty()) {

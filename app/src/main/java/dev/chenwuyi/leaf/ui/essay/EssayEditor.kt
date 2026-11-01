@@ -553,7 +553,7 @@ fun EssayEditor(
                             Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
                                 .navigationBarsPadding()
                                 .heightIn(max = 340.dp)
                                 .verticalScroll(rememberScrollState())
@@ -824,7 +824,7 @@ private fun OutlinePanel(open: Boolean, headings: List<EssayBlock.Paragraph>, on
                     .fillMaxWidth(0.8f)
                     .widthIn(max = 340.dp)
                     .clip(RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
                     .statusBarsPadding()
                     .navigationBarsPadding()
                     .padding(vertical = 16.dp),
@@ -860,7 +860,7 @@ private fun OutlinePanel(open: Boolean, headings: List<EssayBlock.Paragraph>, on
 @Composable
 private fun SidePanel(tab: SideTab, onTab: (SideTab) -> Unit, modifier: Modifier, content: @Composable (SideTab) -> Unit) {
     Column(
-        modifier.background(MaterialTheme.colorScheme.surfaceContainerLow).statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier.background(MaterialTheme.colorScheme.surfaceContainer).statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(
@@ -990,7 +990,8 @@ private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: 
         }
         AnimatedVisibility(
             open,
-            Modifier.align(Alignment.BottomCenter),
+            // A writing width on tablets, as the capture sheet has, instead of edge to edge.
+            Modifier.align(Alignment.BottomCenter).widthIn(max = 640.dp),
             enter = fadeIn() + expandVertically(LeafMotion.expressive(), expandFrom = Alignment.Bottom),
             exit = fadeOut() + shrinkVertically(LeafMotion.tool(), shrinkTowards = Alignment.Bottom),
         ) {
@@ -998,8 +999,8 @@ private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: 
                 Modifier
                     .fillMaxWidth()
                     .heightIn(max = 480.dp)
-                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
                     .navigationBarsPadding()
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
