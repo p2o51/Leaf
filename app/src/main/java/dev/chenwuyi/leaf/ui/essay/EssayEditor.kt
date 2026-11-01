@@ -126,6 +126,7 @@ import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.WallRules
 import dev.chenwuyi.leaf.data.sync.SyncStatus
 import dev.chenwuyi.leaf.ui.component.PictureView
+import dev.chenwuyi.leaf.ui.component.scribbleFill
 import dev.chenwuyi.leaf.ui.component.scribbleShape
 import dev.chenwuyi.leaf.ui.theme.EditorBodyStyle
 import dev.chenwuyi.leaf.ui.theme.EditorTitleStyle
@@ -1066,7 +1067,6 @@ private fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
 
 @Composable
 private fun SyncedScribbleBlock(scribble: Scribble?) {
-    val tones = LocalNotionTones.current
     if (scribble == null) {
         Text(
             "原涂鸦已删除",
@@ -1076,7 +1076,8 @@ private fun SyncedScribbleBlock(scribble: Scribble?) {
         return
     }
     Column(
-        Modifier.fillMaxWidth().clip(scribbleShape(scribble)).background(tones.fill(scribble.color)).padding(horizontal = 16.dp, vertical = 12.dp),
+        // On the page a scribble is the same paper-container leaf as on the wall.
+        Modifier.fillMaxWidth().clip(scribbleShape(scribble)).background(scribbleFill(scribble)).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         scribble.photo?.let { PictureView(it, Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(16.dp))) }

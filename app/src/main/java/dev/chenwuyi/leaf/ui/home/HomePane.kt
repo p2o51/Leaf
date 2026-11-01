@@ -110,11 +110,14 @@ fun HomePane(
             else -> 4
         }
         val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val side = if (maxWidth < 600.dp) 16.dp else 24.dp
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Fixed(columns),
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = top + 10.dp, bottom = 130.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalItemSpacing = 10.dp,
+            // Paperleaf spacing: a phone's 16dp side margin (24 on wider windows), 8 between the cards of
+            // one group, and 24 plus a title-s label between groups.
+            contentPadding = PaddingValues(start = side, end = side, top = top + 10.dp, bottom = 130.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalItemSpacing = 8.dp,
         ) {
             item(key = "search", span = StaggeredGridItemSpan.FullLine) {
                 SearchBar(
@@ -131,12 +134,12 @@ fun HomePane(
             }
             // The strip shows only when there is something on it: no scribbles, no strip and no placeholder.
             if (scribbles.isNotEmpty()) {
-                item(key = "strip", span = StaggeredGridItemSpan.FullLine) { ScribbleStrip(scribbles, onOpenWall, bleed = 12.dp) }
+                item(key = "strip", span = StaggeredGridItemSpan.FullLine) { ScribbleStrip(scribbles, onOpenWall, bleed = side) }
             }
             if (all || sorted.isNotEmpty()) {
                 item(key = "essays-title", span = StaggeredGridItemSpan.FullLine) {
                     // A quiet section label, not a page title: the cards are what the eye should land on.
-                    Text("随笔", Modifier.padding(start = 6.dp, top = 6.dp).animateItem(), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("随笔", Modifier.padding(start = 4.dp, top = 16.dp).animateItem(), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (all && sorted.isEmpty()) {
@@ -158,7 +161,9 @@ fun HomePane(
     ExpandedFullScreenSearchBar(
         state = bar,
         inputField = inputField,
-        colors = SearchBarDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        // The open search page is a page, so it is paper: its cards and scribbles sit on paper-container
+        // and would vanish on paper-high.
+        colors = SearchBarDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         SearchResults(
             query = text.text.toString(),
@@ -217,7 +222,7 @@ private fun SearchResults(query: String, scribbles: List<Scribble>, essays: List
     val hitScribbles = WallRules.search(scribbles, query).sortedByDescending { it.createdAt }
     val hitEssays = WallRules.searchEssays(essays, query)
     // A centred reading width on tablets, rather than results stretched across the whole screen.
-    LazyColumn(Modifier.fillMaxSize().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.fillMaxSize().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (hitScribbles.isEmpty() && hitEssays.isEmpty()) {
             item(key = "none") { Text("没有找到「${query.trim()}」", Modifier.padding(8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
@@ -255,7 +260,7 @@ private fun FilterTitle(filter: HomeFilter, modifier: Modifier = Modifier) {
 
 @Composable
 private fun ResultTitle(label: String) {
-    Text(label, Modifier.padding(start = 4.dp, top = 14.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(label, Modifier.padding(start = 4.dp, top = 16.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /** What a long press on an essay card can do. */

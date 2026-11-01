@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
@@ -93,12 +94,13 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
                 columns = GridCells.Adaptive(340.dp),
                 state = listState,
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 120.dp),
-                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 items(groups, key = { it.key }) { g ->
-                    Column(Modifier.padding(top = 14.dp)) {
-                        Text(g.label, Modifier.padding(bottom = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Paperleaf grouping: 24 and a title-s label between days, 8 between the scribbles of one.
+                    Column(Modifier.padding(top = 24.dp)) {
+                        Text(g.label, Modifier.padding(start = 4.dp, bottom = 8.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             g.scribbles.forEach { s ->
                                 val mark = when {
@@ -223,13 +225,14 @@ private fun SelectionBar(selected: Set<String>, essays: List<Essay>, actions: Wa
 
 @Composable
 private fun BarButton(label: String, @DrawableRes icon: Int, enabled: Boolean, onClick: () -> Unit) {
-    val alpha = if (enabled) 1f else 0.38f
+    // Paperleaf greys nothing with alpha: an unavailable action drops to ink-muted.
+    val ink by animateColorAsState(if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant, LeafMotion.effects(), label = "bar ink")
     Row(
         Modifier.height(48.dp).clip(RoundedCornerShape(24.dp)).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(painterResource(icon), null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+        Icon(painterResource(icon), null, tint = ink)
+        Text(label, style = MaterialTheme.typography.labelLarge, color = ink)
     }
 }
