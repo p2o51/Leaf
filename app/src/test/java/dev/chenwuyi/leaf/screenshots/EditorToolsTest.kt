@@ -50,7 +50,7 @@ class EditorToolsTest {
 
     @Test
     fun should_offer_one_outline_key_when_the_essay_has_a_table_of_contents_block() {
-        val withToc = essay.copy(blocks = listOf(EssayBlock.Other("toc", EssayBlock.TableOfContents)) + essay.blocks)
+        val withToc = essay.copy(blocks = listOf<EssayBlock>(EssayBlock.Other("toc", EssayBlock.TableOfContents)) + essay.blocks)
         val activity = probe("phone-6-one-outline-key") {
             LeafTheme { EssayEditor(withToc, emptyList(), EditorSync(connected = true), {}, {}, {}) }
         }
