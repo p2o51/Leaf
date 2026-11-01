@@ -2,7 +2,6 @@ package dev.chenwuyi.leaf.ui.home
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -50,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.ui.capture.holdToTalk
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
+import dev.chenwuyi.leaf.ui.theme.LocalLeafAccents
 
 // No hint under the labels: menus carry no explanations (51's Do/Don't, 2026-10-24). The colour already
 // tells the scribbles (primary) from the essay (tertiary). The names are the ones the launcher shortcuts,
@@ -102,10 +102,10 @@ fun AddMenu(
             val haptics = LocalHapticFeedback.current
             val rotation by animateFloatAsState(if (expanded) 45f else 0f, LeafMotion.fast(), label = "plus")
             val corner by androidx.compose.animation.core.animateDpAsState(if (expanded) 38.dp else 26.dp, LeafMotion.fast(), label = "corner")
-            // The MD3E morph (round to rounded-square, a 45° turn) stays; the colour now blends on effects
-            // instead of swapping while the shape is still moving.
-            val container by animateColorAsState(if (expanded) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.tertiaryContainer, LeafMotion.effects(), label = "plus fill")
-            val content by animateColorAsState(if (expanded) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onTertiaryContainer, LeafMotion.effects(), label = "plus ink")
+            // Paperleaf's lime, the same + as the editor's: open or closed it keeps its colour, and the MD3E
+            // morph (round to rounded-square, a 45° turn) alone says which.
+            val container = LocalLeafAccents.current.lime
+            val content = LocalLeafAccents.current.onLime
             Box(
                 Modifier
                     .padding(top = 4.dp)

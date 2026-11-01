@@ -90,7 +90,11 @@ private val DarkScheme = darkColorScheme(
 @Composable
 fun LeafTheme(darkTheme: Boolean = isSystemInDarkTheme(), font: ReadingFont = ReadingFont.Serif, content: @Composable () -> Unit) {
     val reading = if (font == ReadingFont.Sans) GoogleSansFlex else FontFamily.Serif
-    CompositionLocalProvider(LocalNotionTones provides if (darkTheme) DarkTones else LightTones, LocalReadingFamily provides reading) {
+    CompositionLocalProvider(
+        LocalNotionTones provides if (darkTheme) DarkTones else LightTones,
+        LocalLeafAccents provides if (darkTheme) DarkAccents else LightAccents,
+        LocalReadingFamily provides reading,
+    ) {
         MaterialTheme(colorScheme = if (darkTheme) DarkScheme else LightScheme, typography = LeafTypography, shapes = LeafShapes) {
             // Screens draw straight onto the surface, so Text needs its default colour from the scheme.
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface, content = content)

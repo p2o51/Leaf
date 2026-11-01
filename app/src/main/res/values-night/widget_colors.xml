@@ -6,4 +6,6 @@
     <color name="widget_on_surface_variant">#B3AEA3</color>
     <color name="widget_primary_container">#225100</color>
     <color name="widget_on_primary_container">#C7F2A4</color>
+    <color name="widget_lime">#C9EC4E</color>
+    <color name="widget_on_lime">#1A2404</color>
 </resources>

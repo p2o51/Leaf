@@ -58,6 +58,7 @@ import dev.chenwuyi.leaf.ui.component.ColorDots
 import dev.chenwuyi.leaf.ui.component.PictureView
 import dev.chenwuyi.leaf.ui.component.scribbleShape
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
+import dev.chenwuyi.leaf.ui.theme.LocalLeafAccents
 import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
 
 /** Which of the phone's two panels is up: the 插入 grid in place of the keyboard, or the 样式 card above it. */
@@ -88,11 +89,11 @@ fun EditorToolbar(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         val inserting = panel == ToolPanel.Insert
-        // The editor is a still zone: the key still turns from round to rounded-square, without the bounce,
-        // and its colour follows on effects instead of swapping at once.
+        // The editor is a still zone: the key still turns from round to rounded-square, without the bounce.
+        // It is the same lime + as home's, and like home's it keeps its colour; the shape says it is open.
         val corner by animateDpAsState(if (inserting) 14.dp else 22.dp, LeafMotion.stillFast(), label = "plus")
-        val keyFill by animateColorAsState(if (inserting) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary, LeafMotion.effects(), label = "plus fill")
-        val keyInk by animateColorAsState(if (inserting) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary, LeafMotion.effects(), label = "plus ink")
+        val keyFill = LocalLeafAccents.current.lime
+        val keyInk = LocalLeafAccents.current.onLime
         Box(
             Modifier
                 .size(44.dp)

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Widget button glyph: the Sheaf Symbols "edit" icon (write a line), copied from ic_sym_edit.xml
-     with the widget colour resource so it follows day and night. -->
+     with the widget colour resource so it follows day and night. It sits on the lime 写一句 key. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="20dp"
     android:height="20dp"
@@ -8,14 +8,14 @@
     android:viewportHeight="24">
     <path
         android:pathData="M6.471 14.135 L14.778 5.828 C15.442 5.164 16.518 5.164 17.182 5.828 L18.172 6.818 C18.836 7.482 18.836 8.558 18.172 9.222 L9.865 17.529 C9.794 17.6 9.707 17.652 9.61 17.68 L6.356 18.637 C6.075 18.72 5.772 18.642 5.565 18.435 C5.358 18.228 5.28 17.925 5.363 17.644 L6.32 14.39 C6.348 14.293 6.4 14.206 6.471 14.135 Z"
-        android:strokeColor="@color/widget_on_primary_container"
+        android:strokeColor="@color/widget_on_lime"
         android:strokeWidth="1.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="#00000000" />
     <path
         android:pathData="M13.222 7.384 L16.616 10.778"
-        android:strokeColor="@color/widget_on_primary_container"
+        android:strokeColor="@color/widget_on_lime"
         android:strokeWidth="1.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"

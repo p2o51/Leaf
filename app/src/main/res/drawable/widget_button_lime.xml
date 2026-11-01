@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's main key in lime, so it is told from the mic beside it as the app's + is from the rest. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/widget_lime" />
+    <corners android:radius="24dp" />
+</shape>

@@ -66,6 +66,24 @@ internal val DarkOutlineVariant = Color(0xFF3A3731)
 // Black at 48%: dark paper needs a heavier scrim to read as a layer.
 internal val DarkScrim = Color(0x7A000000)
 
+// Paperleaf's lime, the highlighter: outside Material's roles, so it rides in LeafAccents below.
+internal val LightLime = Color(0xFFD2F55B)
+internal val LightOnLime = Color(0xFF1F2B06)
+internal val DarkLime = Color(0xFFC9EC4E)
+internal val DarkOnLime = Color(0xFF1A2404)
+
+/**
+ * The colours Leaf needs beyond Material's scheme. [lime] marks the one most important action on a
+ * screen (Leaf's +, at home and in the editor alike) and nothing else; [onLime] is its icon.
+ */
+@Immutable
+data class LeafAccents(val lime: Color, val onLime: Color)
+
+internal val LightAccents = LeafAccents(lime = LightLime, onLime = LightOnLime)
+internal val DarkAccents = LeafAccents(lime = DarkLime, onLime = DarkOnLime)
+
+val LocalLeafAccents = staticCompositionLocalOf { LightAccents }
+
 /**
  * Notion's nine colours as Leaf draws them: same hues, but toned per theme so dark mode stays
  * calm. Meaning (which Notion colour) never changes, only the shade.

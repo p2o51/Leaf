@@ -7,4 +7,7 @@
     <color name="widget_on_surface_variant">#5C5850</color>
     <color name="widget_primary_container">#C7F2A4</color>
     <color name="widget_on_primary_container">#0A2100</color>
+    <!-- Paperleaf's lime (LeafAccents): the widget's main key, 写一句, as the + is in the app. -->
+    <color name="widget_lime">#D2F55B</color>
+    <color name="widget_on_lime">#1F2B06</color>
 </resources>
