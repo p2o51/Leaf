@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.animation)
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 
     implementation(libs.material3.expressive)
     implementation(libs.material.icons.extended)
@@ -74,6 +75,8 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.okhttp.mockwebserver)
+    // Finds popup windows (menus) the way the probe cannot.
+    testImplementation(libs.compose.ui.test.junit4)
 }
 
 fun gitHash(): String =
