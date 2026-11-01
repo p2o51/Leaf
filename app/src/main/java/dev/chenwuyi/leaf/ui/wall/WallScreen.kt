@@ -201,7 +201,7 @@ private fun SelectionBar(selected: Set<String>, essays: List<Essay>, actions: Wa
         Box {
             BarButton("颜色", R.drawable.ic_sym_color, enabled) { colorOpen = true }
             DropdownMenu(colorOpen, { colorOpen = false }, shape = RoundedCornerShape(24.dp)) {
-                ColorDots(null, { actions.recolor(selected, it); colorOpen = false }, Modifier.width(220.dp).padding(14.dp))
+                ColorDots(null, { actions.recolor(selected, it); colorOpen = false }, Modifier.padding(8.dp))
             }
         }
         Box {

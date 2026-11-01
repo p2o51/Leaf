@@ -95,7 +95,8 @@ data class NotionTones(val fills: Map<NotionColor, Color>, val defaultFill: Colo
 
 internal val LightTones = NotionTones(
     fills = mapOf(
-        NotionColor.Gray to Color(0xFFECEAE5),
+        // A step darker than Notion's own grey, which vanished on paper-container (#EFEBE3) in sheets and menus.
+        NotionColor.Gray to Color(0xFFDFDDD8),
         NotionColor.Brown to Color(0xFFF3DDC9),
         NotionColor.Orange to Color(0xFFFFD3AE),
         NotionColor.Yellow to Color(0xFFFFEC8A),

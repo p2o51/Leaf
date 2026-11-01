@@ -301,7 +301,7 @@ fun StyleControls(block: EssayBlock.Paragraph?, onType: (String) -> Unit, onColo
                 }
             }
             // One row that scrolls, rather than nine dots and a lone tenth on the next line.
-            ColorDots(block.color, onColor, Modifier.horizontalScroll(rememberScrollState()))
+            ColorDots(block.color, onColor, Modifier.horizontalScroll(rememberScrollState()), perRow = NotionColor.entries.size)
         }
     }
 }

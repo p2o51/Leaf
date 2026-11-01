@@ -299,7 +299,8 @@ private fun ManagedEssayCard(essay: Essay, active: Boolean, onOpen: () -> Unit, 
                     menu = false
                     if (c != essay.color) actions.recolor(essay, c)
                 },
-                Modifier.widthIn(max = 232.dp).padding(horizontal = 14.dp, vertical = 8.dp),
+                // Two rows of five 48dp dots; the menu takes their width.
+                Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             )
             DropdownMenuItem(
                 text = { Text(if (essay.pinned) "取消置顶" else "置顶") },
