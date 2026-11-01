@@ -62,22 +62,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.List
-import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.Audiotrack
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Movie
-import androidx.compose.material.icons.rounded.PictureAsPdf
-import androidx.compose.material.icons.rounded.CloudDone
-import androidx.compose.material.icons.rounded.CloudOff
-import androidx.compose.material.icons.rounded.DragIndicator
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.HideImage
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -121,6 +105,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
@@ -131,6 +116,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.BlockOrder
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.EssayBlock
@@ -489,7 +475,7 @@ fun EssayEditor(
                                                 },
                                             contentAlignment = Alignment.Center,
                                         ) {
-                                            Icon(Icons.Rounded.DragIndicator, "拖动这一段", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                                            Icon(painterResource(R.drawable.ic_sym_drag_indicator), "拖动这一段", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
                                         }
                                     }
                                 }
@@ -697,7 +683,7 @@ private fun EditorTopBar(
     val disc = if (overCover) surface.copy(alpha = 0.78f * (1f - fill)) else Color.Transparent
     Box(modifier.fillMaxWidth().drawBehind { drawRect(surface.copy(alpha = fill)) }) {
         Row(Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            BarKey(disc, onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
+            BarKey(disc, onBack) { Icon(painterResource(R.drawable.ic_sym_back), "返回") }
             Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
                 val line = flash ?: if (showTitle) title.ifBlank { "无标题" } else ""
                 AnimatedContent(
@@ -722,14 +708,14 @@ private fun EditorTopBar(
                     }
                 }
             }
-            if (hasOutline) BarKey(disc, onOutline) { Icon(Icons.AutoMirrored.Rounded.List, "目录") }
+            if (hasOutline) BarKey(disc, onOutline) { Icon(painterResource(R.drawable.ic_sym_list), "目录") }
             Box {
                 var menu by remember { mutableStateOf(false) }
-                BarKey(disc, { menu = true }) { Icon(Icons.Rounded.MoreVert, "更多") }
+                BarKey(disc, { menu = true }) { Icon(painterResource(R.drawable.ic_sym_more_vertical), "更多") }
                 DropdownMenu(menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
                         text = { Text(if (hasCover) "换封面" else "添加封面") },
-                        leadingIcon = { Icon(Icons.Rounded.Image, null) },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_image), null) },
                         onClick = {
                             menu = false
                             onPickCover()
@@ -738,7 +724,7 @@ private fun EditorTopBar(
                     if (hasCover) {
                         DropdownMenuItem(
                             text = { Text("移除封面") },
-                            leadingIcon = { Icon(Icons.Rounded.HideImage, null) },
+                            leadingIcon = { Icon(painterResource(R.drawable.ic_sym_image_off), null) },
                             onClick = {
                                 menu = false
                                 onRemoveCover()
@@ -763,8 +749,8 @@ private fun CoverImage(cover: Picture, height: androidx.compose.ui.unit.Dp, onPi
     Box {
         PictureView(cover, Modifier.fillMaxWidth().height(height).clickable(onClickLabel = "封面") { menu = true })
         DropdownMenu(menu, onDismissRequest = { menu = false }, modifier = Modifier) {
-            DropdownMenuItem(text = { Text("换封面") }, leadingIcon = { Icon(Icons.Rounded.Image, null) }, onClick = { menu = false; onPick() })
-            DropdownMenuItem(text = { Text("移除封面") }, leadingIcon = { Icon(Icons.Rounded.HideImage, null) }, onClick = { menu = false; onRemove() })
+            DropdownMenuItem(text = { Text("换封面") }, leadingIcon = { Icon(painterResource(R.drawable.ic_sym_image), null) }, onClick = { menu = false; onPick() })
+            DropdownMenuItem(text = { Text("移除封面") }, leadingIcon = { Icon(painterResource(R.drawable.ic_sym_image_off), null) }, onClick = { menu = false; onRemove() })
         }
     }
 }
@@ -786,14 +772,14 @@ private fun MetaLine(essay: Essay, sync: EditorSync, flash: String?) {
             )
         }
         val (icon, label) = when {
-            !sync.connected -> Icons.Rounded.CloudOff to "示例数据"
-            sync.status is SyncStatus.NeedsAttention -> Icons.Rounded.ErrorOutline to "需要处理"
-            sync.status is SyncStatus.Running || flash == Syncing -> Icons.Rounded.Sync to "同步中"
-            sync.status is SyncStatus.Waiting -> Icons.Rounded.Sync to "稍后同步"
-            else -> Icons.Rounded.CloudDone to "已同步到 Notion"
+            !sync.connected -> R.drawable.ic_sym_cloud_off to "示例数据"
+            sync.status is SyncStatus.NeedsAttention -> R.drawable.ic_sym_error to "需要处理"
+            sync.status is SyncStatus.Running || flash == Syncing -> R.drawable.ic_sym_sync to "同步中"
+            sync.status is SyncStatus.Waiting -> R.drawable.ic_sym_sync to "稍后同步"
+            else -> R.drawable.ic_sym_cloud_done to "已同步到 Notion"
         }
         Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, Modifier.size(13.dp), tint = quiet.copy(alpha = 0.8f))
+            Icon(painterResource(icon), null, Modifier.size(13.dp), tint = quiet.copy(alpha = 0.8f))
             Spacer(Modifier.width(4.dp))
             Text(label, style = MaterialTheme.typography.labelSmall, color = quiet.copy(alpha = 0.8f))
         }
@@ -810,7 +796,7 @@ private fun OutlineKey(onClick: () -> Unit) {
         Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClickLabel = "打开目录", onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.AutoMirrored.Rounded.List, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(painterResource(R.drawable.ic_sym_list), null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(6.dp))
         Text("目录", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -1041,10 +1027,10 @@ private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: 
 @Composable
 private fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
     val icon = when (block.type) {
-        "pdf" -> Icons.Rounded.PictureAsPdf
-        "video" -> Icons.Rounded.Movie
-        "audio" -> Icons.Rounded.Audiotrack
-        else -> Icons.Rounded.Description
+        "pdf" -> R.drawable.ic_sym_pdf
+        "video" -> R.drawable.ic_sym_movie
+        "audio" -> R.drawable.ic_sym_audiotrack
+        else -> R.drawable.ic_sym_article
     }
     val kind = when (block.type) {
         "pdf" -> "PDF"
@@ -1066,13 +1052,13 @@ private fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
             Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Icon(painterResource(icon), null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
         }
         Column(Modifier.weight(1f)) {
             Text(block.name.ifBlank { "附件" }, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(kind, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(Icons.AutoMirrored.Rounded.OpenInNew, "打开", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(painterResource(R.drawable.ic_sym_open_in_new), "打开", tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -1094,7 +1080,7 @@ private fun SyncedScribbleBlock(scribble: Scribble?) {
         scribble.photo?.let { PictureView(it, Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(16.dp))) }
         if (scribble.text.isNotBlank()) Text(scribble.text, style = EditorBodyStyle.copy(fontSize = EditorBodyStyle.fontSize * 0.9f))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Sync, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(painterResource(R.drawable.ic_sym_sync), null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 " 同步块 · 涂鸦墙 " + WallRules.dayLabel(scribble.createdAt.atZone(ZoneId.systemDefault()).toLocalDate()),
                 style = MaterialTheme.typography.labelSmall,

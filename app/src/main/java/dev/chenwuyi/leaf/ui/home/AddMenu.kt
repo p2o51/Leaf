@@ -1,5 +1,6 @@
 package dev.chenwuyi.leaf.ui.home
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -21,12 +22,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.PhotoCamera
-import androidx.compose.material.icons.automirrored.rounded.ShortText
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -45,22 +39,24 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.ui.capture.holdToTalk
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 
 // No hint under the labels: menus carry no explanations (51's Do/Don't, 2026-10-24). The colour already
 // tells the scribbles (primary) from the essay (tertiary).
-enum class AddKind(val label: String, val icon: ImageVector) {
-    Photo("拍照", Icons.Rounded.PhotoCamera),
-    Voice("语音", Icons.Rounded.Mic),
-    Text("文本", Icons.AutoMirrored.Rounded.ShortText),
-    Essay("随笔", Icons.Rounded.Edit),
+enum class AddKind(val label: String, @DrawableRes val icon: Int) {
+    Photo("拍照", R.drawable.ic_sym_photo_camera),
+    Voice("语音", R.drawable.ic_sym_mic),
+    Text("文本", R.drawable.ic_sym_short_text),
+    Essay("随笔", R.drawable.ic_sym_essay),
 }
 
 /**
@@ -135,7 +131,7 @@ fun AddMenu(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.Add, contentDescription = "新建：点一下选，长按直接说", Modifier.size(34.dp).rotate(rotation), tint = content)
+                Icon(painterResource(R.drawable.ic_sym_add), contentDescription = "新建：点一下选，长按直接说", Modifier.size(34.dp).rotate(rotation), tint = content)
             }
         }
     }
@@ -156,7 +152,7 @@ private fun MenuItem(kind: AddKind, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(kind.icon, contentDescription = null, tint = fg)
+        Icon(painterResource(kind.icon), contentDescription = null, tint = fg)
         Text(kind.label, style = MaterialTheme.typography.titleMedium, color = fg)
     }
 }

@@ -1,5 +1,6 @@
 package dev.chenwuyi.leaf.ui.wall
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
@@ -29,14 +30,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Sort
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -52,9 +45,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Scribble
@@ -156,39 +150,39 @@ private fun TopBar(state: WallState, title: String, actions: WallActions) {
 private fun TopBarRow(state: WallState, title: String, selecting: Boolean, actions: WallActions) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         if (selecting) {
-            IconButton(onClick = actions.stopSelecting) { Icon(Icons.Rounded.Close, "退出选择") }
+            IconButton(onClick = actions.stopSelecting) { Icon(painterResource(R.drawable.ic_sym_close), "退出选择") }
             Text("已选 ${state.selected.size} 条", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
             Pill("全选", null, actions.selectAll)
         } else {
-            IconButton(onClick = actions.close) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
+            IconButton(onClick = actions.close) { Icon(painterResource(R.drawable.ic_sym_back), "返回") }
             Text(title, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
             var sortOpen by remember { mutableStateOf(false) }
             Box {
-                Pill(state.sort.label, Icons.AutoMirrored.Rounded.Sort) { sortOpen = true }
+                Pill(state.sort.label, R.drawable.ic_sym_sort) { sortOpen = true }
                 DropdownMenu(sortOpen, { sortOpen = false }, shape = RoundedCornerShape(20.dp)) {
                     WallSort.entries.forEach { s ->
                         DropdownMenuItem(
                             text = { Text(s.label) },
                             onClick = { sortOpen = false; actions.setSort(s) },
-                            trailingIcon = { if (s == state.sort) Icon(Icons.Rounded.Check, null) },
+                            trailingIcon = { if (s == state.sort) Icon(painterResource(R.drawable.ic_sym_check), null) },
                         )
                     }
                 }
             }
             Spacer(Modifier.width(8.dp))
-            Pill("选择", Icons.Rounded.Check) { actions.startSelecting(null) }
+            Pill("选择", R.drawable.ic_sym_check_circle) { actions.startSelecting(null) }
         }
     }
 }
 
 @Composable
-private fun Pill(label: String, icon: ImageVector?, onClick: () -> Unit) {
+private fun Pill(label: String, @DrawableRes icon: Int?, onClick: () -> Unit) {
     Row(
         Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).clickable(onClick = onClick).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (icon != null) Icon(icon, null, Modifier.height(18.dp))
+        if (icon != null) Icon(painterResource(icon), null, Modifier.height(18.dp))
         Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
@@ -203,13 +197,13 @@ private fun SelectionBar(selected: Set<String>, essays: List<Essay>, actions: Wa
         var colorOpen by remember { mutableStateOf(false) }
         var copyOpen by remember { mutableStateOf(false) }
         Box {
-            BarButton("颜色", Icons.Rounded.Palette, enabled) { colorOpen = true }
+            BarButton("颜色", R.drawable.ic_sym_color, enabled) { colorOpen = true }
             DropdownMenu(colorOpen, { colorOpen = false }, shape = RoundedCornerShape(24.dp)) {
                 ColorDots(null, { actions.recolor(selected, it); colorOpen = false }, Modifier.width(220.dp).padding(14.dp))
             }
         }
         Box {
-            BarButton("复制到随笔", Icons.Rounded.ContentCopy, enabled) { copyOpen = true }
+            BarButton("复制到随笔", R.drawable.ic_sym_copy, enabled) { copyOpen = true }
             // Second-level menu: a new essay, or one of the existing ones (appended at the end as synced blocks).
             DropdownMenu(copyOpen, { copyOpen = false }, shape = RoundedCornerShape(20.dp)) {
                 Text("复制 ${selected.size} 条到", Modifier.padding(horizontal = 16.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -223,19 +217,19 @@ private fun SelectionBar(selected: Set<String>, essays: List<Essay>, actions: Wa
                 }
             }
         }
-        BarButton("删除", Icons.Rounded.Delete, enabled) { actions.delete(selected) }
+        BarButton("删除", R.drawable.ic_sym_delete, enabled) { actions.delete(selected) }
     }
 }
 
 @Composable
-private fun BarButton(label: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
+private fun BarButton(label: String, @DrawableRes icon: Int, enabled: Boolean, onClick: () -> Unit) {
     val alpha = if (enabled) 1f else 0.38f
     Row(
         Modifier.height(48.dp).clip(RoundedCornerShape(24.dp)).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+        Icon(painterResource(icon), null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
         Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
     }
 }

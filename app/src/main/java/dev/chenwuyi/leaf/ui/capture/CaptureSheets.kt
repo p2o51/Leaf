@@ -29,8 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,8 +48,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.voice.joinTranscript
@@ -149,7 +149,7 @@ private fun SheetDone() {
             Modifier.size(40.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value }.clip(CircleShape).background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+            Icon(painterResource(R.drawable.ic_sym_check), contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
         }
         Text("记下了", style = MaterialTheme.typography.titleMedium)
     }

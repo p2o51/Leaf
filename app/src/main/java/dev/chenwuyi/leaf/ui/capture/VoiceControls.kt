@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,12 +29,14 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.voice.VoiceCopy
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 
@@ -95,7 +95,7 @@ fun VoiceControls(voice: VoiceSession, canSave: Boolean, onSave: () -> Unit) {
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.Mic, contentDescription = null, Modifier.size(38.dp), tint = content)
+                Icon(painterResource(R.drawable.ic_sym_mic), contentDescription = null, Modifier.size(38.dp), tint = content)
             }
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                 Button(onClick = onSave, enabled = canSave && state !is VoiceState.Listening && state !is VoiceState.Finishing) { Text("记下") }

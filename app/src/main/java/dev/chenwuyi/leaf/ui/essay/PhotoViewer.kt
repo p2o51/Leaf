@@ -24,12 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,7 +49,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.ui.component.PictureView
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
@@ -69,17 +65,17 @@ import androidx.compose.material3.DropdownMenu
 internal fun PhotoMenuItems(hasCaption: Boolean, onCaption: () -> Unit, onSave: () -> Unit, onDelete: () -> Unit) {
     DropdownMenuItem(
         text = { Text(if (hasCaption) "编辑标注" else "添加标注") },
-        leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_edit), null) },
         onClick = onCaption,
     )
     DropdownMenuItem(
         text = { Text("保存图片") },
-        leadingIcon = { Icon(Icons.Rounded.Download, null) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_download), null) },
         onClick = onSave,
     )
     DropdownMenuItem(
         text = { Text("删除图片", color = MaterialTheme.colorScheme.error) },
-        leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_delete), null, tint = MaterialTheme.colorScheme.error) },
         onClick = onDelete,
     )
 }
@@ -115,10 +111,10 @@ internal fun PhotoViewer(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Disc(onDismiss) { Icon(Icons.Rounded.Close, "关闭", tint = Color.White) }
+                Disc(onDismiss) { Icon(painterResource(R.drawable.ic_sym_close), "关闭", tint = Color.White) }
                 Spacer(Modifier.weight(1f))
                 Box {
-                    Disc({ menu = true }) { Icon(Icons.Rounded.MoreHoriz, "更多", tint = Color.White) }
+                    Disc({ menu = true }) { Icon(painterResource(R.drawable.ic_sym_more_horizontal), "更多", tint = Color.White) }
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
                         PhotoMenuItems(
                             hasCaption = current.caption.isNotEmpty(),

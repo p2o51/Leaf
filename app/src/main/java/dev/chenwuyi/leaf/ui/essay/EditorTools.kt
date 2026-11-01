@@ -1,5 +1,6 @@
 package dev.chenwuyi.leaf.ui.essay
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
@@ -30,16 +31,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.FormatListNumbered
-import androidx.compose.material.icons.rounded.FormatQuote
-import androidx.compose.material.icons.rounded.Gesture
-import androidx.compose.material.icons.rounded.HorizontalRule
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.KeyboardHide
-import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -50,7 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -59,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Scribble
@@ -106,27 +98,27 @@ fun EditorToolbar(
                 .semantics { contentDescription = "插入"; selected = inserting },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.Add, null, tint = if (inserting) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary)
+            Icon(painterResource(R.drawable.ic_sym_add), null, tint = if (inserting) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary)
         }
         Spacer(Modifier.width(4.dp))
-        ToolButton(Icons.Rounded.TextFields, "样式", on = panel == ToolPanel.Style, enabled = canStyle) {
+        ToolButton(R.drawable.ic_sym_text_size, "样式", on = panel == ToolPanel.Style, enabled = canStyle) {
             onPanel(if (panel == ToolPanel.Style) ToolPanel.None else ToolPanel.Style)
         }
-        ToolButton(Icons.Rounded.Image, "插入照片", onClick = onPhoto)
-        ToolButton(Icons.Rounded.Gesture, "插入涂鸦", onClick = onScribble)
+        ToolButton(R.drawable.ic_sym_image, "插入照片", onClick = onPhoto)
+        ToolButton(R.drawable.ic_sym_scribble, "插入涂鸦", onClick = onScribble)
         // Grows out of the bar's end with the keyboard rather than popping in: the bar widens on the same spring.
         AnimatedVisibility(
             keyboardUp,
             enter = expandHorizontally(LeafMotion.expressive(), expandFrom = Alignment.Start) + fadeIn(LeafMotion.tool()) + scaleIn(LeafMotion.expressive(), initialScale = 0.6f),
             exit = shrinkHorizontally(LeafMotion.tool(), shrinkTowards = Alignment.Start) + fadeOut(LeafMotion.tool()) + scaleOut(LeafMotion.tool(), targetScale = 0.6f),
         ) {
-            ToolButton(Icons.Rounded.KeyboardHide, "收起键盘", onClick = onHideKeyboard)
+            ToolButton(R.drawable.ic_sym_keyboard_hide, "收起键盘", onClick = onHideKeyboard)
         }
     }
 }
 
 @Composable
-private fun ToolButton(icon: ImageVector, label: String, on: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+private fun ToolButton(@DrawableRes icon: Int, label: String, on: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     val tint = when {
         !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
         on -> MaterialTheme.colorScheme.onPrimaryContainer
@@ -140,7 +132,7 @@ private fun ToolButton(icon: ImageVector, label: String, on: Boolean = false, en
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label; selected = on },
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = tint) }
+    ) { Icon(painterResource(icon), null, tint = tint) }
 }
 
 /**
@@ -164,11 +156,11 @@ fun InsertGrid(
         }
         Section("列表与照片") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Tile(InsertKind.Bullet.label, tile, { onPick(InsertKind.Bullet) }) { Icon(Icons.AutoMirrored.Rounded.FormatListBulleted, null) }
-                Tile(InsertKind.Numbered.label, tile, { onPick(InsertKind.Numbered) }) { Icon(Icons.Rounded.FormatListNumbered, null) }
-                Tile(InsertKind.Photo.label, tile, { onPick(InsertKind.Photo) }) { Icon(Icons.Rounded.Image, null) }
-                Tile(InsertKind.Divider.label, tile, { onPick(InsertKind.Divider) }) { Icon(Icons.Rounded.HorizontalRule, null) }
-                Tile("全部涂鸦", tile, { onPick(InsertKind.Scribble) }) { Icon(Icons.Rounded.Gesture, null) }
+                Tile(InsertKind.Bullet.label, tile, { onPick(InsertKind.Bullet) }) { Icon(painterResource(R.drawable.ic_sym_list_bulleted), null) }
+                Tile(InsertKind.Numbered.label, tile, { onPick(InsertKind.Numbered) }) { Icon(painterResource(R.drawable.ic_sym_list_numbered), null) }
+                Tile(InsertKind.Photo.label, tile, { onPick(InsertKind.Photo) }) { Icon(painterResource(R.drawable.ic_sym_image), null) }
+                Tile(InsertKind.Divider.label, tile, { onPick(InsertKind.Divider) }) { Icon(painterResource(R.drawable.ic_sym_horizontal_rule), null) }
+                Tile("全部涂鸦", tile, { onPick(InsertKind.Scribble) }) { Icon(painterResource(R.drawable.ic_sym_scribble), null) }
             }
         }
         if (scribbles.isNotEmpty()) {
@@ -233,9 +225,9 @@ fun ScribbleTile(s: Scribble, modifier: Modifier = Modifier, onClick: () -> Unit
 /** The block kinds 样式 can turn a text block into, in Craft's order: the headings, body, then lists and quote. */
 private val Headings = listOf("heading_1" to "大标题", "heading_2" to "标题", "heading_3" to "小标题", "paragraph" to "正文")
 private val Shapes = listOf(
-    Triple("bulleted_list_item", "列表", Icons.AutoMirrored.Rounded.FormatListBulleted),
-    Triple("numbered_list_item", "编号", Icons.Rounded.FormatListNumbered),
-    Triple("quote", "引用", Icons.Rounded.FormatQuote),
+    Triple("bulleted_list_item", "列表", R.drawable.ic_sym_list_bulleted),
+    Triple("numbered_list_item", "编号", R.drawable.ic_sym_list_numbered),
+    Triple("quote", "引用", R.drawable.ic_sym_quote),
 )
 
 /**
@@ -285,7 +277,7 @@ fun StyleControls(block: EssayBlock.Paragraph?, onType: (String) -> Unit, onColo
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(icon, null, Modifier.size(18.dp))
+                        Icon(painterResource(icon), null, Modifier.size(18.dp))
                         Text(" $label", style = MaterialTheme.typography.labelLarge)
                     }
                 }

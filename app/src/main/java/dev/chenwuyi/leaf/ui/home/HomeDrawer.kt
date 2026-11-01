@@ -13,10 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Label
-import androidx.compose.material.icons.automirrored.rounded.Notes
-import androidx.compose.material.icons.rounded.Gesture
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
@@ -31,9 +27,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.ui.theme.LocalNotionTones
@@ -64,8 +62,10 @@ fun HomeDrawer(
                 Spacer(Modifier.size(12.dp))
                 Text("Leaf", style = MaterialTheme.typography.titleLarge)
             }
-            Item("全部", filter == HomeFilter.All, { Icon(Icons.AutoMirrored.Rounded.Notes, null) }) { onPick(HomeFilter.All) }
-            Item("涂鸦墙", false, { Icon(Icons.Rounded.Gesture, null) }, onOpenWall)
+            // Unfiltered home is the drawer's "home"; its selected state takes the filled twin.
+            val all = filter == HomeFilter.All
+            Item("全部", all, { Icon(painterResource(if (all) R.drawable.ic_sym_home_filled else R.drawable.ic_sym_home), null) }) { onPick(HomeFilter.All) }
+            Item("涂鸦墙", false, { Icon(painterResource(R.drawable.ic_sym_wall), null) }, onOpenWall)
             if (colors.isNotEmpty()) {
                 Group("颜色")
                 val tones = LocalNotionTones.current
@@ -78,7 +78,7 @@ fun HomeDrawer(
             if (tags.isNotEmpty()) {
                 Group("标签")
                 tags.forEach { t ->
-                    Item(t, filter == HomeFilter.ByTag(t), { Icon(Icons.AutoMirrored.Outlined.Label, null) }) { onPick(HomeFilter.ByTag(t)) }
+                    Item(t, filter == HomeFilter.ByTag(t), { Icon(painterResource(R.drawable.ic_sym_label), null) }) { onPick(HomeFilter.ByTag(t)) }
                 }
             }
             Spacer(Modifier.height(16.dp))

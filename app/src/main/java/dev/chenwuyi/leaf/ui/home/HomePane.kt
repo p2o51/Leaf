@@ -31,12 +31,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.DropdownMenu
@@ -68,7 +62,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.NotionColor
@@ -202,14 +198,14 @@ private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenSetting
             // Collapsed, the leading icon opens the drawer, as in Keep; open, it turns into back.
             IconButton(onClick = { if (expanded) scope.launch { bar.animateToCollapsed() } else onOpenDrawer() }) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Menu, if (expanded) null else "分类", Modifier.graphicsLayer { alpha = 1f - turn; rotationZ = 90f * turn })
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, if (expanded) "关闭搜索" else null, Modifier.graphicsLayer { alpha = turn; rotationZ = -90f * (1f - turn) })
+                    Icon(painterResource(R.drawable.ic_sym_menu), if (expanded) null else "分类", Modifier.graphicsLayer { alpha = 1f - turn; rotationZ = 90f * turn })
+                    Icon(painterResource(R.drawable.ic_sym_back), if (expanded) "关闭搜索" else null, Modifier.graphicsLayer { alpha = turn; rotationZ = -90f * (1f - turn) })
                 }
             }
         },
         trailingIcon = {
             if (expanded) {
-                if (text.text.isNotEmpty()) IconButton(onClick = { text.setTextAndPlaceCursorAtEnd("") }) { Icon(Icons.Rounded.Close, "清空") }
+                if (text.text.isNotEmpty()) IconButton(onClick = { text.setTextAndPlaceCursorAtEnd("") }) { Icon(painterResource(R.drawable.ic_sym_close), "清空") }
             } else {
                 // Leaf's mark, the cookie shape, where an avatar would sit. Settings open from here.
                 Box(
@@ -311,7 +307,7 @@ private fun ManagedEssayCard(essay: Essay, active: Boolean, onOpen: () -> Unit, 
             )
             DropdownMenuItem(
                 text = { Text(if (essay.pinned) "取消置顶" else "置顶") },
-                leadingIcon = { Icon(Icons.Rounded.PushPin, null) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_sym_pin), null) },
                 onClick = {
                     menu = false
                     actions.setPinned(essay, !essay.pinned)
@@ -319,7 +315,7 @@ private fun ManagedEssayCard(essay: Essay, active: Boolean, onOpen: () -> Unit, 
             )
             DropdownMenuItem(
                 text = { Text("删除", color = MaterialTheme.colorScheme.error) },
-                leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_sym_delete), null, tint = MaterialTheme.colorScheme.error) },
                 onClick = {
                     menu = false
                     actions.delete(essay)

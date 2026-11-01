@@ -1,5 +1,6 @@
 package dev.chenwuyi.leaf.ui.settings
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.selectable
@@ -29,7 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -63,7 +64,7 @@ internal fun SettingsSection(title: String, content: @Composable () -> Unit) {
 /** Icon, title and an optional one-line detail, then the row's [value] or whatever [trailing] puts at the end. */
 @Composable
 internal fun SettingsRow(
-    icon: ImageVector,
+    @DrawableRes icon: Int,
     title: String,
     modifier: Modifier = Modifier,
     detail: String? = null,
@@ -76,7 +77,7 @@ internal fun SettingsRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-            Icon(icon, null, Modifier.size(24.dp), tint = if (titleColor == Color.Unspecified) MaterialTheme.colorScheme.onSurfaceVariant else titleColor)
+            Icon(painterResource(icon), null, Modifier.size(24.dp), tint = if (titleColor == Color.Unspecified) MaterialTheme.colorScheme.onSurfaceVariant else titleColor)
         }
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -97,7 +98,7 @@ internal fun SettingsRow(
 
 @Composable
 internal fun ActionRow(
-    icon: ImageVector,
+    @DrawableRes icon: Int,
     title: String,
     detail: String? = null,
     value: String? = null,
@@ -155,7 +156,7 @@ internal fun SecretField(value: String, onValueChange: (String) -> Unit, placeho
  */
 @Composable
 internal fun <T> ChoiceRow(
-    icon: ImageVector,
+    @DrawableRes icon: Int,
     title: String,
     options: List<T>,
     selected: T,
@@ -166,7 +167,7 @@ internal fun <T> ChoiceRow(
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                Icon(icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(painterResource(icon), null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(16.dp))
             Text(title, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium))
