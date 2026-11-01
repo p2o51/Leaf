@@ -527,7 +527,6 @@ fun EssayEditor(
                             }
                             EditorToolbar(
                                 panel = panel,
-                                canStyle = styling != null,
                                 keyboardUp = keyboardUp,
                                 onPanel = { next ->
                                     if (next == ToolPanel.Insert) keyboard?.hide()

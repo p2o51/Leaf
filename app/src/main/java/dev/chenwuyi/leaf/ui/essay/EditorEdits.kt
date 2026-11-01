@@ -8,14 +8,15 @@ import dev.chenwuyi.leaf.data.Scribble
 
 /**
  * What the editor's 插入 panel can add, in Craft's order: text styles, lists, then media. [type] is the
- * Notion block type it becomes; [glyph] is the tile's big letter, as Craft draws H1, H2, P.
+ * Notion block type it becomes; [glyph] is the tile's big letter, as Craft draws H1, H2, P. 引用 has
+ * none: its tile draws the shared quote symbol (ic_sym_quote), as the style card does, not a ❝ glyph.
  */
 enum class InsertKind(val label: String, val type: String, val glyph: String) {
     Paragraph("正文", "paragraph", "P"),
     Title("大标题", "heading_1", "H1"),
     Heading("标题", "heading_2", "H2"),
     Subheading("小标题", "heading_3", "H3"),
-    Quote("引用", "quote", "❝"),
+    Quote("引用", "quote", ""),
     Bullet("列表", "bulleted_list_item", "•"),
     Numbered("编号", "numbered_list_item", "1."),
     Photo("照片", "image", ""),
@@ -24,7 +25,8 @@ enum class InsertKind(val label: String, val type: String, val glyph: String) {
     ;
 
     companion object {
-        val TextStyles = listOf(Paragraph, Title, Heading, Subheading, Quote)
+        /** The heading kinds in the style card's order (大标题 / 标题 / 小标题 / 正文), then 引用. */
+        val TextStyles = listOf(Title, Heading, Subheading, Paragraph, Quote)
         val Lists = listOf(Bullet, Numbered)
     }
 }

@@ -66,12 +66,12 @@ enum class ToolPanel { None, Insert, Style }
 
 /**
  * The phone's floating bar above the keyboard, after Craft's: + opens the insert grid, 样式 the style
- * card for the block being edited, then photo and scribble straight in, and a key to put the keyboard away.
+ * card for the block being edited (or its hint when none is), then photo and scribble straight in, and a
+ * key to put the keyboard away.
  */
 @Composable
 fun EditorToolbar(
     panel: ToolPanel,
-    canStyle: Boolean,
     keyboardUp: Boolean,
     onPanel: (ToolPanel) -> Unit,
     onPhoto: () -> Unit,
@@ -106,7 +106,9 @@ fun EditorToolbar(
             Icon(painterResource(R.drawable.ic_sym_add), null, tint = keyInk)
         }
         Spacer(Modifier.width(4.dp))
-        ToolButton(R.drawable.ic_sym_text_size, "样式", on = panel == ToolPanel.Style, enabled = canStyle) {
+        // Always on: with no paragraph picked the style card opens on its one line saying how to pick one,
+        // where a greyed-out key only looked broken.
+        ToolButton(R.drawable.ic_sym_text_size, "样式", on = panel == ToolPanel.Style) {
             onPanel(if (panel == ToolPanel.Style) ToolPanel.None else ToolPanel.Style)
         }
         ToolButton(R.drawable.ic_sym_image, "插入照片", onClick = onPhoto)
@@ -163,7 +165,11 @@ fun InsertGrid(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Section("文字") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                InsertKind.TextStyles.forEach { kind -> Tile(kind.label, tile, { onPick(kind) }) { Glyph(kind.glyph) } }
+                InsertKind.TextStyles.forEach { kind ->
+                    Tile(kind.label, tile, { onPick(kind) }) {
+                        if (kind == InsertKind.Quote) Icon(painterResource(R.drawable.ic_sym_quote), null) else Glyph(kind.glyph)
+                    }
+                }
             }
         }
         Section("列表与照片") {
