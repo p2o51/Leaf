@@ -2,6 +2,7 @@ package dev.chenwuyi.leaf.screenshots
 
 import android.app.Application
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.data.NotionColor
