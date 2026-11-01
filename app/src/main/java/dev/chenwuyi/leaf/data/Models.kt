@@ -76,7 +76,7 @@ sealed interface EssayBlock {
         /** Notion's divider block; Leaf draws it as a rule and can insert one. */
         const val Divider = "divider"
 
-        /** Notion's table of contents block; Leaf draws it as a small 目录 key that opens the outline. */
+        /** Notion's table of contents block; Leaf leaves it out of the page, as the bar's 目录 key opens the outline. */
         const val TableOfContents = "table_of_contents"
     }
 }

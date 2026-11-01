@@ -58,7 +58,7 @@ import dev.chenwuyi.leaf.ui.theme.LeafMotion
 import androidx.compose.material3.DropdownMenu
 
 /**
- * The same three actions wherever a photo offers a menu: the ⋯ in the viewer and a long press in the page.
+ * The same three actions wherever a photo offers a menu: the ⋮ in the viewer and a long press in the page.
  * 标注 is the photo's caption in Notion.
  */
 @Composable
@@ -81,7 +81,7 @@ internal fun PhotoMenuItems(hasCaption: Boolean, onCaption: () -> Unit, onSave: 
 }
 
 /**
- * A photo on its own, filling the screen: pinch or double tap to zoom, ⋯ (or a long press) for its menu,
+ * A photo on its own, filling the screen: pinch or double tap to zoom, ⋮ (or a long press) for its menu,
  * and its 标注 under it when it has one. [photo] null closes it.
  */
 @Composable
@@ -115,7 +115,7 @@ internal fun PhotoViewer(
                 Disc(onDismiss) { Icon(painterResource(R.drawable.ic_sym_close), "关闭", tint = Color.White) }
                 Spacer(Modifier.weight(1f))
                 Box {
-                    Disc({ menu = true }) { Icon(painterResource(R.drawable.ic_sym_more_horizontal), "更多", tint = Color.White) }
+                    Disc({ menu = true }) { Icon(painterResource(R.drawable.ic_sym_more_vertical), "更多", tint = Color.White) }
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
                         PhotoMenuItems(
                             hasCaption = current.caption.isNotEmpty(),

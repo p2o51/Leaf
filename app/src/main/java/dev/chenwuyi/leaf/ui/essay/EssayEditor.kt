@@ -449,7 +449,9 @@ fun EssayEditor(
                                             // Paperleaf's rule token, the one hairline it keeps.
                                             color = MaterialTheme.colorScheme.outlineVariant,
                                         )
-                                        EssayBlock.TableOfContents -> OutlineKey { outlineOpen = true }
+                                        // The bar's 目录 key is the one way to the outline; a second key in the text
+                                        // only made two of them. The block stays in Notion, untouched.
+                                        EssayBlock.TableOfContents -> Unit
                                         else -> Text(
                                             "Notion 里的「${block.type}」块，Leaf 先不改它",
                                             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp),
@@ -795,19 +797,6 @@ private fun MetaLine(essay: Essay, sync: EditorSync, flash: String?) {
 
 private fun fullDay(day: LocalDate): String =
     if (day.year == LocalDate.now().year) WallRules.dayLabel(day) else "${day.year}年${WallRules.dayLabel(day)}"
-
-/** Notion's table of contents block in the text: a small key that opens the outline from the right. */
-@Composable
-private fun OutlineKey(onClick: () -> Unit) {
-    Row(
-        Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClickLabel = "打开目录", onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(painterResource(R.drawable.ic_sym_list), null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(6.dp))
-        Text("目录", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
 
 /** The outline, a sheet pulled in from the right edge over a scrim; a heading takes the page to it. */
 @Composable

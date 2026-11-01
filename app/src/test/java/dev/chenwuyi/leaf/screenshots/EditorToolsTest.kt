@@ -9,6 +9,7 @@ import dev.chenwuyi.leaf.ui.essay.EditorSync
 import dev.chenwuyi.leaf.ui.essay.EssayEditor
 import dev.chenwuyi.leaf.ui.theme.LeafTheme
 import java.time.Instant
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,7 +18,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The phone bar's 样式 key stays on with nothing picked and then says how to pick a paragraph. */
+/**
+ * The phone bar's 样式 key stays on with nothing picked and then says how to pick a paragraph; the
+ * outline has one way in, the bar's 目录 key.
+ */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = Application::class, sdk = [35], qualifiers = "w411dp-h891dp-xhdpi")
@@ -42,5 +46,15 @@ class EditorToolsTest {
         aa.tap()
         val texts = semanticsNodes(activity).flatMap { it.texts() }
         assertTrue("the hint shows: $texts", "点一下正文里的一段，再来改它的样式" in texts)
+    }
+
+    @Test
+    fun should_offer_one_outline_key_when_the_essay_has_a_table_of_contents_block() {
+        val withToc = essay.copy(blocks = listOf(EssayBlock.Other("toc", EssayBlock.TableOfContents)) + essay.blocks)
+        val activity = probe("phone-6-one-outline-key") {
+            LeafTheme { EssayEditor(withToc, emptyList(), EditorSync(connected = true), {}, {}, {}) }
+        }
+        val keys = semanticsNodes(activity).filter { "目录" in it.descriptions() || "目录" in it.texts() || it.clickLabel() == "打开目录" }
+        assertEquals("only the bar's key: ${keys.map { it.descriptions() + it.texts() }}", 1, keys.size)
     }
 }
