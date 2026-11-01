@@ -1,8 +1,6 @@
 package dev.chenwuyi.leaf.screenshots
 
 import android.app.Application
-import android.view.View
-import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -29,6 +27,8 @@ import dev.chenwuyi.leaf.ui.wall.WallActions
 import dev.chenwuyi.leaf.ui.wall.WallScreen
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -78,20 +78,34 @@ class WallMenuTest {
         settleFrames()
     }
 
-    /** Nodes in windows other than the activity's own: the menu is a popup window. */
-    private fun popupNodes(activity: ComponentActivity): List<SemanticsNode> {
-        val global = Class.forName("android.view.WindowManagerGlobal")
-        val instance = global.getMethod("getInstance").invoke(null)
-        val field = global.getDeclaredField("mViews").apply { isAccessible = true }
-        @Suppress("UNCHECKED_CAST")
-        val own = activity.window.decorView
-        // Every window but the activity's own: each test builds one activity, so the others are its popups
-        // (Robolectric does not always give a popup the token of the window it opened over).
-        val roots = (field.get(instance) as List<View>).toList().filter { it !== own }
-        fun walk(v: View): List<View> = if (v is ViewGroup) listOf(v) + (0 until v.childCount).flatMap { walk(v.getChildAt(it)) } else listOf(v)
-        fun SemanticsNode.all(): List<SemanticsNode> = listOf(this) + children.flatMap { it.all() }
-        return roots.flatMap(::walk).filterIsInstance<ViewRootForTest>().flatMap { it.semanticsOwner.rootSemanticsNode.all() }
+    /** Every Compose root built while a test runs; a popup (the menu) builds its own. */
+    private val roots = mutableListOf<ViewRootForTest>()
+
+    @Before
+    fun watchRoots() {
+        ViewRootForTest.onViewCreatedCallback = { roots += it }
     }
+
+    @After
+    fun stopWatching() {
+        ViewRootForTest.onViewCreatedCallback = null
+    }
+
+    /**
+     * Nodes in Compose roots outside the activity's own view tree: the menu is a popup window. Found the way
+     * compose-ui-test finds them, through the root-created callback, since Robolectric does not reliably list
+     * popup windows in WindowManagerGlobal.
+     */
+    private fun popupNodes(activity: ComponentActivity): List<SemanticsNode> {
+        val own = activity.window.decorView
+        fun SemanticsNode.all(): List<SemanticsNode> = listOf(this) + children.flatMap { it.all() }
+        val popups = roots.filter { it.view.rootView !== own }
+        return popups.flatMap { it.semanticsOwner.rootSemanticsNode.all() }
+    }
+
+    /** What the roots were, for a failure message. */
+    private fun rootsSeen(activity: ComponentActivity): String =
+        roots.joinToString { "${it.view.javaClass.simpleName}(own=${it.view.rootView === activity.window.decorView}, attached=${it.view.isAttachedToWindow})" }
 
     @Test
     fun should_open_the_colour_menu_instead_of_selecting_when_a_scribble_is_long_pressed() {
@@ -101,7 +115,7 @@ class WallMenuTest {
         assertTrue("no selection started: $selecting", selecting.isEmpty())
         val menu = popupNodes(activity)
         val names = menu.flatMap { it.descriptions() }
-        assertTrue("the ten colour dots: $names", NotionColor.entries.all { swatchLabel(it) in names })
+        assertTrue("the ten colour dots: $names; roots: ${rootsSeen(activity)}", NotionColor.entries.all { swatchLabel(it) in names })
         val texts = menu.flatMap { it.texts() }
         assertTrue("选择 and 删除 in the menu: $texts", "选择" in texts && "删除" in texts)
     }
