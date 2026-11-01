@@ -167,6 +167,9 @@ fun EssayEditor(
     start: EditorStart = EditorStart(),
     onOpenFile: (EssayBlock.Attachment) -> Unit = {},
     onSavePhoto: (EssayBlock.Photo) -> Unit = {},
+    // A photo's delete gets its own call: the app holds it back for an undo window, where a block removed
+    // by Backspace is just gone.
+    onRemovePhoto: (String) -> Unit = onRemoveBlock,
 ) {
     // Typing goes to a local draft first: waiting for Room's round trip would drop fast keystrokes.
     var draft by remember(essay.id) { mutableStateOf(essay) }
@@ -205,7 +208,7 @@ fun EssayEditor(
         if (viewing == id) viewing = null
         draft = EditorEdits.remove(draft, id)
         lastEdit = System.currentTimeMillis()
-        onRemoveBlock(id)
+        onRemovePhoto(id)
     }
     val keyboard = LocalSoftwareKeyboardController.current
     val keyboardUp = WindowInsets.isImeVisible

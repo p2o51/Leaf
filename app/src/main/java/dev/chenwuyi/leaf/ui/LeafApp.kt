@@ -277,6 +277,12 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                                 onMoveBlock = { id, to -> vm.moveBlock(e.id, id, to) },
                                                 onCover = { cover -> vm.setCover(e.id, cover) },
                                                 onOpenFile = { file -> vm.openFile(file, openLink) },
+                                                onRemovePhoto = { id ->
+                                                    // Out of sight at once, out of Notion only when the snackbar has gone; 撤销 brings it
+                                                    // back into the page (the editor takes the essay over again).
+                                                    vm.removePhoto(e.id, id)
+                                                    notify("删了照片") { vm.undoRemovePhoto(e.id, id) }
+                                                },
                                                 onSavePhoto = { photo ->
                                                     scope.launch {
                                                         val saved = vm.photoBytes(photo)?.let { GallerySaver.save(context, it) } == true

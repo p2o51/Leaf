@@ -34,6 +34,9 @@ data class WallState(
     val selected: Set<String> = emptySet(),
 )
 
+/** A block out of sight during its undo window: [after] is the block it sat behind (null when first), [index] its place then. */
+private data class HiddenBlock(val block: EssayBlock, val after: String?, val index: Int)
+
 @OptIn(DelicateCoroutinesApi::class)
 class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> Unit = {}) : ViewModel() {
     val scribbles: StateFlow<List<Scribble>> = repository.scribbles.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -41,8 +44,23 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
     private val deletingState = MutableStateFlow<Set<String>>(emptySet())
     private val deleteJobs = mutableMapOf<String, Job>()
 
-    val essays: StateFlow<List<Essay>> = combine(repository.essays, deletingState) { all, gone -> if (gone.isEmpty()) all else all.filterNot { it.id in gone } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** Photos taken out of an essay but still inside their undo window, by essay id, in the order they went. */
+    private val hiddenState = MutableStateFlow<Map<String, List<HiddenBlock>>>(emptyMap())
+    private val hideJobs = mutableMapOf<String, Job>()
+
+    /** The essays as stored, photos in their undo window included: block moves are counted against these. */
+    private val storedEssays: StateFlow<List<Essay>> = repository.essays.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val essays: StateFlow<List<Essay>> = combine(storedEssays, deletingState, hiddenState) { all, gone, hidden ->
+        if (gone.isEmpty() && hidden.isEmpty()) {
+            all
+        } else {
+            all.filterNot { it.id in gone }.map { e ->
+                val ids = hidden[e.id].orEmpty().map { it.block.id }.toSet()
+                if (ids.isEmpty()) e else e.copy(blocks = e.blocks.filterNot { it.id in ids })
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val filterState = MutableStateFlow<HomeFilter>(HomeFilter.All)
     /** The drawer's pick. Home, the strip and the wall all show only what matches it. */
@@ -150,7 +168,10 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
     }
 
     fun updateEssay(essay: Essay) {
-        viewModelScope.launch { repository.updateEssay(essay) }
+        // The editor's draft no longer has a photo in its undo window; it goes back in before the write, so
+        // an edit made meanwhile neither deletes it nor shifts the positions of the blocks around it.
+        val full = withHidden(essay)
+        viewModelScope.launch { repository.updateEssay(full) }
     }
 
     fun removeBlock(essayId: String, blockId: String) {
@@ -158,7 +179,63 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
     }
 
     fun moveBlock(essayId: String, blockId: String, toIndex: Int) {
-        viewModelScope.launch { repository.moveBlock(essayId, blockId, toIndex) }
+        // [toIndex] counts the blocks the editor shows; the stored essay still holds any photo in its undo
+        // window, so the index is translated to the stored list: the block goes in front of the shown block
+        // it lands before, and a hidden photo stays where it was.
+        val hiddenIds = hiddenState.value[essayId].orEmpty().map { it.block.id }.toSet()
+        val stored = storedEssays.value.firstOrNull { it.id == essayId }?.blocks
+        val target = if (hiddenIds.isEmpty() || stored == null) {
+            toIndex
+        } else {
+            val rest = stored.filterNot { it.id == blockId }
+            rest.filterNot { it.id in hiddenIds }.getOrNull(toIndex)?.let { before -> rest.indexOfFirst { it.id == before.id } } ?: rest.size
+        }
+        viewModelScope.launch { repository.moveBlock(essayId, blockId, target) }
+    }
+
+    /**
+     * Takes a photo out of the essay at once and out of Room and Notion only after [undoMillis], unless
+     * [undoRemovePhoto] comes first; the same window as an essay's delete, so 撤销 costs nothing in Notion.
+     */
+    fun removePhoto(essayId: String, blockId: String, undoMillis: Long = UndoWindowMillis) {
+        val blocks = essays.value.firstOrNull { it.id == essayId }?.blocks ?: return
+        val at = blocks.indexOfFirst { it.id == blockId }
+        if (at < 0) return
+        val hidden = HiddenBlock(blocks[at], after = blocks.getOrNull(at - 1)?.id, index = at)
+        hiddenState.update { it + (essayId to (it[essayId].orEmpty() + hidden)) }
+        hideJobs.remove(blockId)?.cancel()
+        hideJobs[blockId] = viewModelScope.launch {
+            delay(undoMillis)
+            repository.removeBlocks(essayId, setOf(blockId))
+            hideJobs.remove(blockId)
+            // Only once Room has dropped it, so the photo never flashes back in between.
+            unhide(essayId, blockId)
+        }
+    }
+
+    fun undoRemovePhoto(essayId: String, blockId: String) {
+        hideJobs.remove(blockId)?.cancel()
+        unhide(essayId, blockId)
+    }
+
+    private fun unhide(essayId: String, blockId: String) = hiddenState.update { all ->
+        val left = all[essayId].orEmpty().filterNot { it.block.id == blockId }
+        if (left.isEmpty()) all - essayId else all + (essayId to left)
+    }
+
+    /**
+     * [essay] with its hidden photos put back where they sat. The last one hidden goes back first: a photo
+     * hidden earlier is then already in place for a later one that sat right behind it.
+     */
+    private fun withHidden(essay: Essay): Essay {
+        val hidden = hiddenState.value[essay.id] ?: return essay
+        var blocks = essay.blocks
+        hidden.asReversed().forEach { h ->
+            if (blocks.any { it.id == h.block.id }) return@forEach
+            val at = if (h.after == null) 0 else blocks.indexOfFirst { it.id == h.after }.let { if (it >= 0) it + 1 else h.index.coerceAtMost(blocks.size) }
+            blocks = blocks.take(at) + h.block + blocks.drop(at)
+        }
+        return essay.copy(blocks = blocks)
     }
 
     fun setCover(essayId: String, cover: Picture?) {
@@ -196,6 +273,12 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
         if (pending.isNotEmpty()) {
             deleteJobs.values.forEach { it.cancel() }
             GlobalScope.launch(NonCancellable) { pending.forEach { repository.deleteEssay(it) } }
+        }
+        // The same for photos still in their undo window.
+        val photos = hiddenState.value
+        if (photos.isNotEmpty()) {
+            hideJobs.values.forEach { it.cancel() }
+            GlobalScope.launch(NonCancellable) { photos.forEach { (essayId, hidden) -> repository.removeBlocks(essayId, hidden.map { it.block.id }.toSet()) } }
         }
     }
 
