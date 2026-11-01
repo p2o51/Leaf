@@ -1,10 +1,13 @@
 package dev.chenwuyi.leaf.screenshots
 
 import android.app.Application
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import dev.chenwuyi.leaf.R
+import dev.chenwuyi.leaf.data.HomeFilter
+import dev.chenwuyi.leaf.data.SampleData
 import dev.chenwuyi.leaf.data.settings.VoiceHint
 import dev.chenwuyi.leaf.data.voice.VoiceRecognizers
 import dev.chenwuyi.leaf.ui.capture.Capture
@@ -12,6 +15,7 @@ import dev.chenwuyi.leaf.ui.capture.CaptureSheet
 import dev.chenwuyi.leaf.ui.capture.VoiceSession
 import dev.chenwuyi.leaf.ui.home.AddKind
 import dev.chenwuyi.leaf.ui.home.AddMenu
+import dev.chenwuyi.leaf.ui.home.HomePane
 import dev.chenwuyi.leaf.ui.theme.LeafTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,8 +47,16 @@ class EntryNamesTest {
 
     @Test
     @Config(qualifiers = "w411dp-h891dp-night-xhdpi")
-    fun should_draw_the_open_add_menu_when_dark() {
-        probe("home-phone-9-add-menu-dark") { LeafTheme { AddMenu(true, {}, {}, {}, {}) } }
+    fun should_draw_the_open_add_menu_over_home_when_dark() {
+        // A picture only: the lime + and the four names over home and its scrim.
+        probe("home-phone-9-add-menu-dark") {
+            LeafTheme {
+                Box {
+                    HomePane(SampleData.scribbles, SampleData.essays, HomeFilter.All, SampleData.scribbles, SampleData.essays, null, { _, _ -> }, {}, {})
+                    AddMenu(true, {}, {}, {}, {})
+                }
+            }
+        }
     }
 
     @Test
