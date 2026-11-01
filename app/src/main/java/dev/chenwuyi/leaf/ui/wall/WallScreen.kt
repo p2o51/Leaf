@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
@@ -46,6 +47,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -76,7 +80,10 @@ class WallActions(
     val tapScribble: (String) -> Unit,
 )
 
-/** The full scribble wall: everything grouped by day (or colour), with sort, select, recolour, delete and 复制到随笔. */
+/**
+ * The full scribble wall: everything grouped by day (or colour), with sort, select, recolour, delete and 复制到随笔.
+ * One scribble recolours from its own long press; several go through 选择.
+ */
 @Composable
 fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>, actions: WallActions, modifier: Modifier = Modifier, title: String = "涂鸦墙") {
     val groups = remember(scribbles, state.sort) { WallRules.groups(scribbles, state.sort) }
@@ -110,14 +117,7 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
                                     s.id in state.nearIds -> ChipMark.Near
                                     else -> ChipMark.None
                                 }
-                                ScribbleChip(
-                                    s,
-                                    Modifier.sharedScribble(s.id),
-                                    large = true,
-                                    mark = mark,
-                                    onClick = { if (state.selecting) actions.toggle(s.id) else actions.tapScribble(s.id) },
-                                    onLongClick = { if (state.selecting) actions.toggle(s.id) else actions.startSelecting(s.id) },
-                                )
+                                WallScribble(s, mark, state.selecting, actions)
                             }
                         }
                     }
@@ -133,6 +133,72 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
             SelectionBar(state.selected, essays, actions)
         }
     }
+}
+
+/**
+ * One scribble on the wall. A long press lifts it and opens the menu an essay card's long press does: the
+ * colour dots recolour this one at once (it took four steps through selection), 选择 starts picking several
+ * from it, and 删除 comes last. While picking, a tap or a long press toggles it, as before.
+ */
+@Composable
+private fun WallScribble(s: Scribble, mark: ChipMark, selecting: Boolean, actions: WallActions) {
+    var menu by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    val lift by animateFloatAsState(if (menu) 1.03f else 1f, LeafMotion.fast(), label = "scribble lift")
+    Box {
+        ScribbleChip(
+            s,
+            Modifier.sharedScribble(s.id).graphicsLayer { scaleX = lift; scaleY = lift },
+            large = true,
+            mark = mark,
+            onClick = { if (selecting) actions.toggle(s.id) else actions.tapScribble(s.id) },
+            onLongClick = {
+                if (selecting) {
+                    actions.toggle(s.id)
+                } else {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    menu = true
+                }
+            },
+        )
+        DropdownMenu(menu && !selecting, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
+            ScribbleMenu(
+                s,
+                onRecolor = { c ->
+                    menu = false
+                    if (c != s.color) actions.recolor(setOf(s.id), c)
+                },
+                onSelect = {
+                    menu = false
+                    actions.startSelecting(s.id)
+                },
+                onDelete = {
+                    menu = false
+                    actions.delete(setOf(s.id))
+                },
+            )
+        }
+    }
+}
+
+/**
+ * What a scribble's long press offers, in the essay card menu's order: the colour dots (not for a photo,
+ * which has no paper to colour), 选择, and 删除 last.
+ */
+@Composable
+internal fun ScribbleMenu(s: Scribble, onRecolor: (NotionColor) -> Unit, onSelect: () -> Unit, onDelete: () -> Unit) {
+    // Two rows of five 48dp dots; the menu takes their width.
+    if (s.photo == null) ColorDots(s.color, onRecolor, Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+    DropdownMenuItem(
+        text = { Text("选择") },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_check_circle), null) },
+        onClick = onSelect,
+    )
+    DropdownMenuItem(
+        text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_delete), null, tint = MaterialTheme.colorScheme.error) },
+        onClick = onDelete,
+    )
 }
 
 @Composable
