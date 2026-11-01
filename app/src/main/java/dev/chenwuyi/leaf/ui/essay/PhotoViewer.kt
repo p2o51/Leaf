@@ -101,8 +101,9 @@ internal fun PhotoViewer(
 
     AnimatedVisibility(
         photo != null,
-        enter = fadeIn(LeafMotion.tool()) + scaleIn(LeafMotion.expressive(), initialScale = 0.92f),
-        exit = fadeOut(LeafMotion.tool()) + scaleOut(LeafMotion.tool(), targetScale = 0.92f),
+        // Looking at a photo is reading too: it opens without overshoot, its fade on effects.
+        enter = fadeIn(LeafMotion.effects()) + scaleIn(LeafMotion.still(), initialScale = 0.92f),
+        exit = fadeOut(LeafMotion.effects()) + scaleOut(LeafMotion.still(), targetScale = 0.92f),
     ) {
         val current = shown ?: return@AnimatedVisibility
         Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -134,7 +135,7 @@ internal fun PhotoViewer(
 private fun ZoomablePicture(photo: EssayBlock.Photo, onLongPress: () -> Unit) {
     var scale by remember(photo.id) { mutableFloatStateOf(1f) }
     var pan by remember(photo.id) { mutableStateOf(Offset.Zero) }
-    val shownScale by animateFloatAsState(scale, LeafMotion.tool(), label = "zoom")
+    val shownScale by animateFloatAsState(scale, LeafMotion.still(), label = "zoom")
     Box(
         Modifier
             .fillMaxSize()

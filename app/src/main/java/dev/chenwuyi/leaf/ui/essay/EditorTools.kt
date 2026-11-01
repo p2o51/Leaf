@@ -2,6 +2,7 @@ package dev.chenwuyi.leaf.ui.essay
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.scaleIn
@@ -39,7 +40,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -78,9 +78,9 @@ fun EditorToolbar(
     onHideKeyboard: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Flat, as all of Paperleaf: the bar is told from the page by its paper-high, not by a shadow.
     Row(
         modifier
-            .shadow(6.dp, CircleShape)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(6.dp),
@@ -88,17 +88,21 @@ fun EditorToolbar(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         val inserting = panel == ToolPanel.Insert
-        val corner by animateDpAsState(if (inserting) 14.dp else 22.dp, LeafMotion.fast(), label = "plus")
+        // The editor is a still zone: the key still turns from round to rounded-square, without the bounce,
+        // and its colour follows on effects instead of swapping at once.
+        val corner by animateDpAsState(if (inserting) 14.dp else 22.dp, LeafMotion.stillFast(), label = "plus")
+        val keyFill by animateColorAsState(if (inserting) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary, LeafMotion.effects(), label = "plus fill")
+        val keyInk by animateColorAsState(if (inserting) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary, LeafMotion.effects(), label = "plus ink")
         Box(
             Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(corner))
-                .background(if (inserting) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary)
+                .background(keyFill)
                 .clickable(role = Role.Button) { onPanel(if (inserting) ToolPanel.None else ToolPanel.Insert) }
                 .semantics { contentDescription = "插入"; selected = inserting },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(painterResource(R.drawable.ic_sym_add), null, tint = if (inserting) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary)
+            Icon(painterResource(R.drawable.ic_sym_add), null, tint = keyInk)
         }
         Spacer(Modifier.width(4.dp))
         ToolButton(R.drawable.ic_sym_text_size, "样式", on = panel == ToolPanel.Style, enabled = canStyle) {
@@ -110,8 +114,8 @@ fun EditorToolbar(
         // the still one, since this happens every time the keyboard rises mid-sentence.
         AnimatedVisibility(
             keyboardUp,
-            enter = expandHorizontally(LeafMotion.still(), expandFrom = Alignment.Start) + fadeIn(LeafMotion.tool()) + scaleIn(LeafMotion.still(), initialScale = 0.6f),
-            exit = shrinkHorizontally(LeafMotion.tool(), shrinkTowards = Alignment.Start) + fadeOut(LeafMotion.tool()) + scaleOut(LeafMotion.tool(), targetScale = 0.6f),
+            enter = expandHorizontally(LeafMotion.still(), expandFrom = Alignment.Start) + fadeIn(LeafMotion.effects()) + scaleIn(LeafMotion.still(), initialScale = 0.6f),
+            exit = shrinkHorizontally(LeafMotion.still(), shrinkTowards = Alignment.Start) + fadeOut(LeafMotion.effects()) + scaleOut(LeafMotion.still(), targetScale = 0.6f),
         ) {
             ToolButton(R.drawable.ic_sym_keyboard_hide, "收起键盘", onClick = onHideKeyboard)
         }
@@ -120,16 +124,22 @@ fun EditorToolbar(
 
 @Composable
 private fun ToolButton(@DrawableRes icon: Int, label: String, on: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
-    val tint = when {
-        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-        on -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    // Unavailable takes the outline tone rather than ink-muted at an alpha (Paperleaf greys nothing with alpha).
+    val tint by animateColorAsState(
+        when {
+            !enabled -> MaterialTheme.colorScheme.outline
+            on -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        LeafMotion.effects(),
+        label = "tool ink",
+    )
+    val fill by animateColorAsState(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, LeafMotion.effects(), label = "tool fill")
     Box(
         Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+            .background(fill)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label; selected = on },
         contentAlignment = Alignment.Center,
@@ -237,7 +247,7 @@ private val Shapes = listOf(
  */
 @Composable
 fun StyleControls(block: EssayBlock.Paragraph?, onType: (String) -> Unit, onColor: (NotionColor) -> Unit, modifier: Modifier = Modifier) {
-    AnimatedContent(block == null, modifier, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "style") { none ->
+    AnimatedContent(block == null, modifier, transitionSpec = { fadeIn(LeafMotion.effects()) togetherWith fadeOut(LeafMotion.effects()) }, label = "style") { none ->
         if (none || block == null) {
             Text("点一下正文里的一段，再来改它的样式", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             return@AnimatedContent

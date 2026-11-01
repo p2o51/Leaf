@@ -85,7 +85,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -319,7 +318,7 @@ fun EssayEditor(
         }
     }
     val showTitle by remember { derivedStateOf { list.firstVisibleItemIndex >= 2 } }
-    val fill by animateFloatAsState(solid, LeafMotion.tool(), label = "bar")
+    val fill by animateFloatAsState(solid, LeafMotion.effects(), label = "bar")
 
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest)) {
         // A wide editor pane (a tablet's, beside the list) keeps Craft's side panel instead of the floating bar.
@@ -444,7 +443,8 @@ fun EssayEditor(
                                         EssayBlock.Divider -> HorizontalDivider(
                                             longPressDrag.fillMaxWidth().padding(vertical = 14.dp),
                                             thickness = 1.dp,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
+                                            // Paperleaf's rule token, the one hairline it keeps.
+                                            color = MaterialTheme.colorScheme.outlineVariant,
                                         )
                                         EssayBlock.TableOfContents -> OutlineKey { outlineOpen = true }
                                         else -> Text(
@@ -458,7 +458,7 @@ fun EssayEditor(
                                 // The text block being edited shows its handle in the margin; dragging it moves the block.
                                 // One holding more in Notion than Leaf can write back (children, formatting) has none.
                                 if (block is EssayBlock.Paragraph && BlockOrder.movable(block)) {
-                                    val handle by animateFloatAsState(if (focused == block.id || dragging) 1f else 0f, LeafMotion.tool(), label = "handle")
+                                    val handle by animateFloatAsState(if (focused == block.id || dragging) 1f else 0f, LeafMotion.effects(), label = "handle")
                                     if (handle > 0f) {
                                         Box(
                                             Modifier
@@ -478,7 +478,7 @@ fun EssayEditor(
                                                 },
                                             contentAlignment = Alignment.Center,
                                         ) {
-                                            Icon(painterResource(R.drawable.ic_sym_drag_indicator), "拖动这一段", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                                            Icon(painterResource(R.drawable.ic_sym_drag_indicator), "拖动这一段", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
                                 }
@@ -507,8 +507,9 @@ fun EssayEditor(
                         ) {
                             AnimatedVisibility(
                                 panel == ToolPanel.Style,
-                                enter = fadeIn() + scaleIn(LeafMotion.expressive(), initialScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 1f)),
-                                exit = fadeOut() + scaleOut(LeafMotion.tool(), targetScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 1f)),
+                                // Still zone: the card settles without overshoot, its alpha on effects.
+                                enter = fadeIn(LeafMotion.effects()) + scaleIn(LeafMotion.still(), initialScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 1f)),
+                                exit = fadeOut(LeafMotion.effects()) + scaleOut(LeafMotion.still(), targetScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 1f)),
                             ) {
                                 StyleControls(
                                     styling,
@@ -516,7 +517,6 @@ fun EssayEditor(
                                     recolor,
                                     Modifier
                                         .widthIn(max = 460.dp)
-                                        .shadow(8.dp, RoundedCornerShape(28.dp))
                                         .clip(RoundedCornerShape(28.dp))
                                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                         .padding(16.dp),
@@ -543,8 +543,8 @@ fun EssayEditor(
                 if (!wide) {
                     AnimatedVisibility(
                         panel == ToolPanel.Insert,
-                        enter = expandVertically(LeafMotion.expressive(), expandFrom = Alignment.Top),
-                        exit = shrinkVertically(LeafMotion.tool(), shrinkTowards = Alignment.Top),
+                        enter = expandVertically(LeafMotion.still(), expandFrom = Alignment.Top),
+                        exit = shrinkVertically(LeafMotion.still(), shrinkTowards = Alignment.Top),
                     ) {
                         InsertGrid(
                             pickable,
@@ -589,7 +589,7 @@ fun EssayEditor(
                     scope.launch {
                         list.animateScrollToItem(headerItems + at)
                         // Clear of the bar lying over the top of the list.
-                        list.animateScrollBy(-barPx)
+                        list.animateScrollBy(-barPx, LeafMotion.still())
                     }
                 }
             },
@@ -692,8 +692,8 @@ private fun EditorTopBar(
                 AnimatedContent(
                     targetState = line to (flash != null),
                     transitionSpec = {
-                        (fadeIn(LeafMotion.tool()) + slideInVertically(LeafMotion.expressive()) { it / 2 }) togetherWith
-                            (fadeOut(LeafMotion.tool()) + slideOutVertically(LeafMotion.tool()) { -it / 2 })
+                        (fadeIn(LeafMotion.effects()) + slideInVertically(LeafMotion.still()) { it / 2 }) togetherWith
+                            (fadeOut(LeafMotion.effects()) + slideOutVertically(LeafMotion.still()) { -it / 2 })
                     },
                     contentAlignment = Alignment.Center,
                     label = "bar line",
@@ -769,7 +769,8 @@ private fun MetaLine(essay: Essay, sync: EditorSync, flash: String?) {
         essay.tags.forEach { tag ->
             Text(
                 tag,
-                Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)).padding(horizontal = 8.dp, vertical = 3.dp),
+                // A tag is a chip, full round on paper-high, as on the essay cards.
+                Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 8.dp, vertical = 3.dp),
                 style = MaterialTheme.typography.labelMedium,
                 color = quiet,
             )
@@ -782,9 +783,10 @@ private fun MetaLine(essay: Essay, sync: EditorSync, flash: String?) {
             else -> R.drawable.ic_sym_cloud_done to "已同步到 Notion"
         }
         Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(painterResource(icon), null, Modifier.size(13.dp), tint = quiet.copy(alpha = 0.8f))
+            // Ink-muted as it is: Paperleaf greys no text with alpha.
+            Icon(painterResource(icon), null, Modifier.size(13.dp), tint = quiet)
             Spacer(Modifier.width(4.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, color = quiet.copy(alpha = 0.8f))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = quiet)
         }
     }
 }
@@ -809,14 +811,14 @@ private fun OutlineKey(onClick: () -> Unit) {
 @Composable
 private fun OutlinePanel(open: Boolean, headings: List<EssayBlock.Paragraph>, onDismiss: () -> Unit, onPick: (String) -> Unit) {
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(open, enter = fadeIn(LeafMotion.tool()), exit = fadeOut(LeafMotion.tool())) {
+        AnimatedVisibility(open, enter = fadeIn(LeafMotion.effects()), exit = fadeOut(LeafMotion.effects())) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).clickable(interactionSource = null, indication = null, onClick = onDismiss))
         }
         AnimatedVisibility(
             open,
             Modifier.align(Alignment.CenterEnd),
-            enter = slideInHorizontally(LeafMotion.expressive()) { it },
-            exit = slideOutHorizontally(LeafMotion.tool()) { it },
+            enter = slideInHorizontally(LeafMotion.still()) { it },
+            exit = slideOutHorizontally(LeafMotion.still()) { it },
         ) {
             Column(
                 Modifier
@@ -884,7 +886,7 @@ private fun SidePanel(tab: SideTab, onTab: (SideTab) -> Unit, modifier: Modifier
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-            AnimatedContent(tab, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "side") { content(it) }
+            AnimatedContent(tab, transitionSpec = { fadeIn(LeafMotion.effects()) togetherWith fadeOut(LeafMotion.effects()) }, label = "side") { content(it) }
         }
     }
 }
@@ -939,7 +941,7 @@ private fun placeholderFor(type: String): String = when (type) {
 @Composable
 private fun PlainField(value: String, placeholder: String, style: TextStyle, modifier: Modifier = Modifier, onValue: (String) -> Unit) {
     Box {
-        if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+        if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
         BasicTextField(
             value,
             onValue,
@@ -974,7 +976,7 @@ private fun PhotoBlock(
                 PhotoMenuItems(block.caption.isNotEmpty(), onCaption = onCaptionStart, onSave = onSave, onDelete = onRemove)
             }
         }
-        AnimatedVisibility(captionOpen, enter = fadeIn(LeafMotion.tool()) + expandVertically(LeafMotion.expressive()), exit = fadeOut(LeafMotion.tool()) + shrinkVertically(LeafMotion.tool())) {
+        AnimatedVisibility(captionOpen, enter = fadeIn(LeafMotion.effects()) + expandVertically(LeafMotion.still()), exit = fadeOut(LeafMotion.effects()) + shrinkVertically(LeafMotion.still())) {
             PlainField(block.caption, "写一句标注", MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), captionModifier, onCaption)
         }
     }
@@ -985,15 +987,15 @@ private fun PhotoBlock(
 private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: () -> Unit, onPick: (Scribble) -> Unit) {
     val tones = LocalNotionTones.current
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(open, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(open, enter = fadeIn(LeafMotion.effects()), exit = fadeOut(LeafMotion.effects())) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).clickable(interactionSource = null, indication = null, onClick = onDismiss))
         }
         AnimatedVisibility(
             open,
             // A writing width on tablets, as the capture sheet has, instead of edge to edge.
             Modifier.align(Alignment.BottomCenter).widthIn(max = 640.dp),
-            enter = fadeIn() + expandVertically(LeafMotion.expressive(), expandFrom = Alignment.Bottom),
-            exit = fadeOut() + shrinkVertically(LeafMotion.tool(), shrinkTowards = Alignment.Bottom),
+            enter = fadeIn(LeafMotion.effects()) + expandVertically(LeafMotion.still(), expandFrom = Alignment.Bottom),
+            exit = fadeOut(LeafMotion.effects()) + shrinkVertically(LeafMotion.still(), shrinkTowards = Alignment.Bottom),
         ) {
             Column(
                 Modifier
