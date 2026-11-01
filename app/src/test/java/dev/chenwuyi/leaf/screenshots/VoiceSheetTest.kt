@@ -50,12 +50,11 @@ class VoiceSheetTest {
     }
 
     @Test
-    fun should_leave_out_the_recording_explanation_when_the_microphone_is_not_granted_yet() {
-        // Robolectric grants no permission, so this is the sheet before the first hold.
+    fun should_say_where_the_voice_goes_when_the_microphone_is_not_granted_yet() {
+        // Robolectric grants no permission, so this is the sheet before the first hold: the moment of consent.
         val activity = probe("voice-sheet-2-no-mic") { Sheet(Capture.Voice) }
         val texts = unmergedNodes(activity).flatMap { it.texts() }
-        assertTrue("the quiet line says what holding does: $texts", VoiceCopy.Ready in texts)
-        assertTrue("no line about where the audio goes: $texts", texts.none { it.startsWith("只在按住时收音") })
+        assertTrue("one line about where the audio goes: $texts", texts.count { it.startsWith("只在按住时收音") } == 1)
     }
 
     @Test
