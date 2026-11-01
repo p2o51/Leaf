@@ -22,6 +22,11 @@ is an essay with a cover or a Keep-style card colour.
 JDK 21 and the Android SDK. `./gradlew assembleDebug testDebugUnitTest`. CI does the same plus
 `assembleRelease` and uploads the debug APK as an artifact.
 
+## Icons
+
+Icons are the shared Sheaf Symbols from the Daylist repo's `tools/symbols/` (no Material Icons).
+To regenerate `app/src/main/res/drawable/ic_sym_*.xml`, run `python3 build.py --app <this repo>/app` there.
+
 ## Notion sign-in
 
 Settings leads with **用 Notion 登录**; a pasted internal-integration token stays as the fallback.
