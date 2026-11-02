@@ -550,6 +550,9 @@ fun EssayEditor(
                         enter = expandVertically(LeafMotion.still(), expandFrom = Alignment.Top),
                         exit = shrinkVertically(LeafMotion.still(), shrinkTowards = Alignment.Top),
                     ) {
+                        // Edge to edge: the sheet and its scrolling rows run under the gesture bar; only the end of
+                        // the rows is padded clear of it (51, 2026-11-02: the rows used to stop short above it).
+                        val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                         InsertGrid(
                             pickable,
                             onPick,
@@ -558,10 +561,10 @@ fun EssayEditor(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                                 .background(MaterialTheme.colorScheme.surfaceContainer)
-                                .navigationBarsPadding()
-                                .heightIn(max = 340.dp)
+                                .heightIn(max = 340.dp + navInset)
                                 .verticalScroll(rememberScrollState())
-                                .padding(20.dp),
+                                .padding(20.dp)
+                                .padding(bottom = navInset),
                         )
                     }
                 }
@@ -819,14 +822,14 @@ private fun OutlinePanel(open: Boolean, headings: List<EssayBlock.Paragraph>, on
                     .clip(RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainer)
                     .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .padding(vertical = 16.dp),
+                    .padding(top = 16.dp),
             ) {
                 Text("目录", Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.titleMedium)
                 if (headings.isEmpty()) {
                     Text("这篇还没有标题", Modifier.padding(horizontal = 24.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
+                // The list scrolls under the gesture bar; its end is padded clear of it.
+                LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())) {
                     items(headings, key = { it.id }) { h ->
                         val level = when (h.type) { "heading_1" -> 0; "heading_2" -> 1; else -> 2 }
                         Text(
@@ -977,6 +980,7 @@ private fun PhotoBlock(
 @Composable
 private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: () -> Unit, onPick: (Scribble) -> Unit) {
     val tones = LocalNotionTones.current
+    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Box(Modifier.fillMaxSize()) {
         AnimatedVisibility(open, enter = fadeIn(LeafMotion.effects()), exit = fadeOut(LeafMotion.effects())) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).clickable(interactionSource = null, indication = null, onClick = onDismiss))
@@ -991,18 +995,18 @@ private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: 
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 480.dp)
+                    .heightIn(max = 480.dp + navInset)
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .navigationBarsPadding()
-                    .padding(20.dp),
+                    .padding(start = 20.dp, top = 20.dp, end = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text("插入涂鸦", style = MaterialTheme.typography.titleMedium)
                 if (scribbles.isEmpty()) {
                     Text("涂鸦墙还是空的", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // The rows scroll under the gesture bar; the list's end is padded clear of it.
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 20.dp + navInset)) {
                     items(scribbles, key = { it.id }) { s ->
                         Row(
                             Modifier.fillMaxWidth().clip(scribbleShape(s)).background(tones.fill(s.color)).clickable { onPick(s) }.padding(horizontal = 16.dp, vertical = 12.dp),
