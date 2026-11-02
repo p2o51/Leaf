@@ -7,14 +7,14 @@
     android:viewportHeight="24"
     android:autoMirrored="false">
     <path
-        android:pathData="M5.072 8.6 C3.261 11.736 3.783 15.697 6.343 18.257 C8.903 20.817 12.864 21.339 16 19.528 C19.136 17.718 20.665 14.027 19.727 10.529 C18.79 7.032 15.621 4.6 12 4.6"
+        android:pathData="M4.75 15.581 C6.225 18.745 9.583 20.587 13.044 20.132 C16.506 19.676 19.272 17.028 19.878 13.589 C20.485 10.151 18.791 6.716 15.694 5.104 C12.597 3.492 8.812 4.074 6.343 6.543"
         android:strokeColor="#FF000000"
         android:strokeWidth="1.5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="#00000000" />
     <path
-        android:pathData="M13.901 1.585 L12 4.6 L15.015 6.501"
+        android:pathData="M6.343 2.763 L6.343 6.543 L10.123 6.543"
         android:strokeColor="#FF000000"
         android:strokeWidth="1.5"
         android:strokeLineCap="round"
