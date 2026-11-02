@@ -65,13 +65,13 @@ class HomeScreenshots {
         val drawer = rememberDrawerState(if (drawerOpen) DrawerValue.Open else DrawerValue.Closed)
         ModalNavigationDrawer(
             drawerState = drawer,
-            drawerContent = { HomeDrawer(drawer, filter, TagRules.colorsInUse(scribbles, essays), TagRules.all(scribbles, essays), {}, {}) },
+            drawerContent = { HomeDrawer(drawer, filter, TagRules.colorsInUse(scribbles, essays), TagRules.all(scribbles, essays), {}, {}, {}) },
         ) {
             HomePane(
                 scribbles.filter { TagRules.matches(it, filter) },
                 essays.filter { TagRules.matches(it, filter) },
                 filter, scribbles, essays, null,
-                { _, _ -> }, {}, {}, {},
+                { _, _ -> }, {}, {},
             )
         }
     }

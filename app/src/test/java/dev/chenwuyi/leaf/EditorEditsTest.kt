@@ -20,6 +20,13 @@ class EditorEditsTest {
     private fun essay(vararg blocks: EssayBlock) = Essay("e", "t", blocks.toList(), NotionColor.Default, null, false, Instant.EPOCH)
 
     @Test
+    fun should_list_the_text_tiles_in_the_style_card_order_when_the_insert_grid_shows_them() {
+        assertEquals(listOf("大标题", "标题", "小标题", "正文", "引用"), InsertKind.TextStyles.map { it.label })
+        // 引用 draws the shared quote symbol, as the style card does, rather than a ❝ character.
+        assertTrue(InsertKind.Quote.glyph.isEmpty())
+    }
+
+    @Test
     fun should_insert_after_the_focused_block_when_one_is_focused() {
         val e = essay(EssayBlock.Paragraph("a", "一"), EssayBlock.Paragraph("b", "二"))
         val out = EditorEdits.insertAfter(e, "a", listOf(EditorEdits.blank(InsertKind.Heading, newId)))

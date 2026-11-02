@@ -19,16 +19,10 @@ private fun isWide(c: Char): Boolean =
 
 /** Every line hold-to-talk can show, in one place so the wording can be reviewed at once. */
 object VoiceCopy {
-    fun permission(route: VoiceRoute): String = when (route) {
-        VoiceRoute.System -> "只在按住时收音，转写可能经过系统的联网服务"
-        VoiceRoute.Cloud -> "只在按住时收音，松开后发给 ElevenLabs 转写"
-        else -> "只在按住时收音，转写在这台设备上完成"
-    }
-
     const val Ready = "按住说，松开就转写"
     const val Holding = "在听，松开结束"
     const val Finishing = "转写中"
-    const val Transcribed = "转写好了，改一改再记下"
+    const val Transcribed = "转写好了，可以改一改"
     const val HoldToTalk = "要按住说话，松开结束"
     const val Denied = "没有麦克风权限，先用打字"
     const val Unavailable = "这台设备不能语音转写，先用打字，或者在设置里填上 ElevenLabs 密钥"

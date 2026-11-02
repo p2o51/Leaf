@@ -5,40 +5,84 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import dev.chenwuyi.leaf.data.NotionColor
 
-// Lime + indigo, shared with Sheaf's palette (prototype v3).
+// Paperleaf: the same warm paper and ink as Sheaf; Leaf's primary is leaf green and the brand
+// ink blue steps back to tertiary. Secondary, error and outline are spelled out so nothing falls
+// back to Material's baseline purple.
 internal val LightPrimary = Color(0xFF2F6B00)
 internal val LightOnPrimary = Color(0xFFFFFFFF)
-internal val LightPrimaryContainer = Color(0xFFC6F36A)
-internal val LightOnPrimaryContainer = Color(0xFF102000)
+internal val LightPrimaryContainer = Color(0xFFC7F2A4)
+internal val LightOnPrimaryContainer = Color(0xFF0A2100)
+internal val LightSecondary = Color(0xFF57624A)
+internal val LightOnSecondary = Color(0xFFFFFFFF)
+internal val LightSecondaryContainer = Color(0xFFE6E3F3)
+internal val LightOnSecondaryContainer = Color(0xFF1D1B30)
 internal val LightTertiary = Color(0xFF3A3FCB)
 internal val LightOnTertiary = Color(0xFFFFFFFF)
 internal val LightTertiaryContainer = Color(0xFFDFE0FF)
-internal val LightOnTertiaryContainer = Color(0xFF14176B)
-internal val LightSurface = Color(0xFFFCFDF6)
-internal val LightSurfaceLow = Color(0xFFF3F7E7)
-internal val LightSurfaceContainer = Color(0xFFEBF2D9)
-internal val LightSurfaceHigh = Color(0xFFE2ECC9)
-internal val LightSurfaceHighest = Color(0xFFD5E5B2)
-internal val LightOnSurface = Color(0xFF17200E)
-internal val LightOnSurfaceVariant = Color(0xFF56624A)
-internal val LightScrim = Color(0x66101808)
+internal val LightOnTertiaryContainer = Color(0xFF191C7A)
+internal val LightError = Color(0xFFB3261E)
+internal val LightOnError = Color(0xFFFFFFFF)
+internal val LightErrorContainer = Color(0xFFF9DEDC)
+internal val LightOnErrorContainer = Color(0xFF410E0B)
+internal val LightSurface = Color(0xFFFBF9F4)
+internal val LightSurfaceLowest = Color(0xFFFBF9F4)
+internal val LightSurfaceLow = Color(0xFFF5F2EB)
+internal val LightSurfaceContainer = Color(0xFFEFEBE3)
+internal val LightSurfaceHigh = Color(0xFFE8E4DB)
+internal val LightSurfaceHighest = Color(0xFFE1DCD2)
+internal val LightOnSurface = Color(0xFF1C1B18)
+internal val LightOnSurfaceVariant = Color(0xFF5C5850)
+internal val LightOutline = Color(0xFF9A9488)
+internal val LightOutlineVariant = Color(0xFFD9D3C7)
+// Ink at 32%, as the brand book puts the scrim behind sheets.
+internal val LightScrim = Color(0x521C1B18)
 
-internal val DarkPrimary = Color(0xFFA9D650)
-internal val DarkOnPrimary = Color(0xFF1A3700)
-internal val DarkPrimaryContainer = Color(0xFF3E6B00)
-internal val DarkOnPrimaryContainer = Color(0xFFD9FF8F)
-internal val DarkTertiary = Color(0xFFBEC2FF)
-internal val DarkOnTertiary = Color(0xFF1E2187)
-internal val DarkTertiaryContainer = Color(0xFF353AA6)
+internal val DarkPrimary = Color(0xFF95D868)
+internal val DarkOnPrimary = Color(0xFF0A2100)
+internal val DarkPrimaryContainer = Color(0xFF225100)
+internal val DarkOnPrimaryContainer = Color(0xFFC7F2A4)
+internal val DarkSecondary = Color(0xFFBFCBAD)
+internal val DarkOnSecondary = Color(0xFF29341F)
+internal val DarkSecondaryContainer = Color(0xFF3A3950)
+internal val DarkOnSecondaryContainer = Color(0xFFE3E1F9)
+internal val DarkTertiary = Color(0xFFBFC2FF)
+internal val DarkOnTertiary = Color(0xFF1E228E)
+internal val DarkTertiaryContainer = Color(0xFF2E33A8)
 internal val DarkOnTertiaryContainer = Color(0xFFE0E0FF)
-internal val DarkSurface = Color(0xFF12160D)
-internal val DarkSurfaceLow = Color(0xFF1A1F14)
-internal val DarkSurfaceContainer = Color(0xFF1E2418)
-internal val DarkSurfaceHigh = Color(0xFF282F21)
-internal val DarkSurfaceHighest = Color(0xFF33392B)
-internal val DarkOnSurface = Color(0xFFE2E6D6)
-internal val DarkOnSurfaceVariant = Color(0xFFC2C9B4)
-internal val DarkScrim = Color(0x99000000)
+internal val DarkError = Color(0xFFF2B8B5)
+internal val DarkOnError = Color(0xFF601410)
+internal val DarkErrorContainer = Color(0xFF8C1D18)
+internal val DarkOnErrorContainer = Color(0xFFF9DEDC)
+internal val DarkSurface = Color(0xFF141311)
+internal val DarkSurfaceLowest = Color(0xFF141311)
+internal val DarkSurfaceLow = Color(0xFF1A1916)
+internal val DarkSurfaceContainer = Color(0xFF211F1B)
+internal val DarkSurfaceHigh = Color(0xFF2A2824)
+internal val DarkSurfaceHighest = Color(0xFF34312C)
+internal val DarkOnSurface = Color(0xFFEAE6DD)
+internal val DarkOnSurfaceVariant = Color(0xFFB3AEA3)
+internal val DarkOutline = Color(0xFF77726A)
+internal val DarkOutlineVariant = Color(0xFF3A3731)
+// Black at 48%: dark paper needs a heavier scrim to read as a layer.
+internal val DarkScrim = Color(0x7A000000)
+
+// Paperleaf's lime, the highlighter: outside Material's roles, so it rides in LeafAccents below.
+internal val LightLime = Color(0xFFD2F55B)
+internal val LightOnLime = Color(0xFF1F2B06)
+internal val DarkLime = Color(0xFFC9EC4E)
+internal val DarkOnLime = Color(0xFF1A2404)
+
+/**
+ * The colours Leaf needs beyond Material's scheme. [lime] marks the one most important action on a
+ * screen (Leaf's +, at home and in the editor alike) and nothing else; [onLime] is its icon.
+ */
+@Immutable
+data class LeafAccents(val lime: Color, val onLime: Color)
+
+internal val LightAccents = LeafAccents(lime = LightLime, onLime = LightOnLime)
+internal val DarkAccents = LeafAccents(lime = DarkLime, onLime = DarkOnLime)
+
+val LocalLeafAccents = staticCompositionLocalOf { LightAccents }
 
 /**
  * Notion's nine colours as Leaf draws them: same hues, but toned per theme so dark mode stays
@@ -51,7 +95,8 @@ data class NotionTones(val fills: Map<NotionColor, Color>, val defaultFill: Colo
 
 internal val LightTones = NotionTones(
     fills = mapOf(
-        NotionColor.Gray to Color(0xFFECEAE5),
+        // A step darker than Notion's own grey, which vanished on paper-container (#EFEBE3) in sheets and menus.
+        NotionColor.Gray to Color(0xFFDFDDD8),
         NotionColor.Brown to Color(0xFFF3DDC9),
         NotionColor.Orange to Color(0xFFFFD3AE),
         NotionColor.Yellow to Color(0xFFFFEC8A),
@@ -68,7 +113,8 @@ internal val LightTones = NotionTones(
 
 internal val DarkTones = NotionTones(
     fills = mapOf(
-        NotionColor.Gray to Color(0xFF3A3935),
+        // A step lighter than 0xFF3A3935, which all but vanished on the dark drawer and sheets (paper-container #211F1B).
+        NotionColor.Gray to Color(0xFF4A4843),
         NotionColor.Brown to Color(0xFF4A3528),
         NotionColor.Orange to Color(0xFF5A3A1E),
         NotionColor.Yellow to Color(0xFF4F4614),

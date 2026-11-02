@@ -55,7 +55,7 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_button"
+            android:background="@drawable/widget_button_lime"
             android:gravity="center"
             android:orientation="horizontal">
 
@@ -71,7 +71,7 @@
                 android:layout_marginStart="8dp"
                 android:fontFamily="sans-serif-medium"
                 android:text="@string/quick_write"
-                android:textColor="@color/widget_on_primary_container"
+                android:textColor="@color/widget_on_lime"
                 android:textSize="15sp" />
         </LinearLayout>
 

@@ -29,8 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,8 +48,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.voice.joinTranscript
@@ -72,10 +72,22 @@ sealed interface Capture {
     data class Photo(val picture: Picture, override val initial: String = "") : Capture
 }
 
-/** One sheet for every way of adding a scribble: a line of text, a colour, and for photos the picture and a caption. */
+/** Paperleaf's PaperSheet: radius-xl on top, on paper-container, flat. */
+private val SheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+
+/**
+ * One sheet for every way of adding a scribble: a line of text, a colour, and for photos the picture and a
+ * caption. [hint] is a quiet line under the voice sheet's title (VoiceHint), null almost always.
+ */
 @Composable
-fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit) {
-    // After 记下 the sheet stays a moment with a tick and 记下了, then slides away (Paw's SheetFinisher),
+fun CaptureSheet(
+    capture: Capture?,
+    voice: VoiceSession,
+    onDismiss: () -> Unit,
+    onSave: (text: String, color: NotionColor, photo: Picture?) -> Unit,
+    hint: String? = null,
+) {
+    // After 完成 the sheet stays a moment with a tick and 记下了, then slides away (Paw's SheetFinisher),
     // instead of vanishing the instant the scribble is saved. The scribble itself is saved at once.
     // [finishing] holds the sheet up for the pause; [done] keeps the tick shown through the slide away
     // too, so the form (which would take focus and bring the keyboard back) never returns as it leaves.
@@ -94,7 +106,7 @@ fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, 
     }
     val visible = capture != null || finishing
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(visible, enter = fadeIn(LeafMotion.effects()), exit = fadeOut(LeafMotion.effects())) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).clickable(interactionSource = null, indication = null, onClick = onDismiss))
         }
         AnimatedVisibility(
@@ -116,7 +128,7 @@ fun CaptureSheet(capture: Capture?, voice: VoiceSession, onDismiss: () -> Unit, 
                 if (finished) {
                     SheetDone()
                 } else {
-                    SheetBody(shown, voice) { text, color, photo ->
+                    SheetBody(shown, voice, hint) { text, color, photo ->
                         finishing = true
                         done = true
                         onSave(text, color, photo)
@@ -138,8 +150,8 @@ private fun SheetDone() {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(SheetShape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .navigationBarsPadding()
             .padding(horizontal = 20.dp, vertical = 28.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
@@ -149,14 +161,14 @@ private fun SheetDone() {
             Modifier.size(40.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value }.clip(CircleShape).background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+            Icon(painterResource(R.drawable.ic_sym_check), contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
         }
         Text("记下了", style = MaterialTheme.typography.titleMedium)
     }
 }
 
 @Composable
-private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, NotionColor, Picture?) -> Unit) {
+private fun SheetBody(capture: Capture, voice: VoiceSession, hint: String?, onSave: (String, NotionColor, Picture?) -> Unit) {
     var text by rememberSaveable(capture) { mutableStateOf(capture.initial) }
     var color by rememberSaveable(capture) { mutableStateOf(NotionColor.Default) }
     val focus = remember { FocusRequester() }
@@ -177,8 +189,8 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, No
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(SheetShape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .navigationBarsPadding()
             .imePadding()
             .padding(20.dp),
@@ -186,17 +198,21 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, No
     ) {
         Text(
             when (capture) {
-                is Capture.Text -> "记一条涂鸦"
+                is Capture.Text -> "写一句"
                 Capture.Voice -> "说一句"
                 is Capture.Photo -> "这张照片记成涂鸦"
             },
             style = MaterialTheme.typography.titleMedium,
         )
+        if (isVoice && hint != null) {
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         if (photo != null) {
             PictureView(photo, Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(24.dp)))
         }
         Box(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest).padding(horizontal = 18.dp, vertical = 14.dp),
+            // Paperleaf's filled field: paper-high, radius-s.
+            Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             val live = (voice.state as? VoiceState.Listening)?.text ?: (voice.state as? VoiceState.Finishing)?.text
             if (isVoice && !live.isNullOrEmpty()) {
@@ -227,7 +243,7 @@ private fun SheetBody(capture: Capture, voice: VoiceSession, onSave: (String, No
             VoiceControls(voice, canSave, save)
         } else {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = save, enabled = canSave) { Text("记下") }
+                Button(onClick = save, enabled = canSave) { Text(ConfirmLabel) }
             }
         }
     }

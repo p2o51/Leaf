@@ -1,8 +1,11 @@
 package dev.chenwuyi.leaf.ui.wall
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
@@ -29,14 +32,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Sort
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -52,9 +47,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.Scribble
@@ -81,7 +80,10 @@ class WallActions(
     val tapScribble: (String) -> Unit,
 )
 
-/** The full scribble wall: everything grouped by day (or colour), with sort, select, recolour, delete and 复制到随笔. */
+/**
+ * The full scribble wall: everything grouped by day (or colour), with sort, select, recolour, delete and 复制到随笔.
+ * One scribble recolours from its own long press; several go through 选择.
+ */
 @Composable
 fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>, actions: WallActions, modifier: Modifier = Modifier, title: String = "涂鸦墙") {
     val groups = remember(scribbles, state.sort) { WallRules.groups(scribbles, state.sort) }
@@ -99,12 +101,13 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
                 columns = GridCells.Adaptive(340.dp),
                 state = listState,
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 120.dp),
-                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 120.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 items(groups, key = { it.key }) { g ->
-                    Column(Modifier.padding(top = 14.dp)) {
-                        Text(g.label, Modifier.padding(bottom = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // Paperleaf grouping: 24 and a title-s label between days, 8 between the scribbles of one.
+                    Column(Modifier.padding(top = 24.dp)) {
+                        Text(g.label, Modifier.padding(start = 4.dp, bottom = 8.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             g.scribbles.forEach { s ->
                                 val mark = when {
@@ -114,14 +117,7 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
                                     s.id in state.nearIds -> ChipMark.Near
                                     else -> ChipMark.None
                                 }
-                                ScribbleChip(
-                                    s,
-                                    Modifier.sharedScribble(s.id),
-                                    large = true,
-                                    mark = mark,
-                                    onClick = { if (state.selecting) actions.toggle(s.id) else actions.tapScribble(s.id) },
-                                    onLongClick = { if (state.selecting) actions.toggle(s.id) else actions.startSelecting(s.id) },
-                                )
+                                WallScribble(s, mark, state.selecting, actions)
                             }
                         }
                     }
@@ -137,6 +133,72 @@ fun WallScreen(state: WallState, scribbles: List<Scribble>, essays: List<Essay>,
             SelectionBar(state.selected, essays, actions)
         }
     }
+}
+
+/**
+ * One scribble on the wall. A long press lifts it and opens the menu an essay card's long press does: the
+ * colour dots recolour this one at once (it took four steps through selection), 选择 starts picking several
+ * from it, and 删除 comes last. While picking, a tap or a long press toggles it, as before.
+ */
+@Composable
+private fun WallScribble(s: Scribble, mark: ChipMark, selecting: Boolean, actions: WallActions) {
+    var menu by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    val lift by animateFloatAsState(if (menu) 1.03f else 1f, LeafMotion.fast(), label = "scribble lift")
+    Box {
+        ScribbleChip(
+            s,
+            Modifier.sharedScribble(s.id).graphicsLayer { scaleX = lift; scaleY = lift },
+            large = true,
+            mark = mark,
+            onClick = { if (selecting) actions.toggle(s.id) else actions.tapScribble(s.id) },
+            onLongClick = {
+                if (selecting) {
+                    actions.toggle(s.id)
+                } else {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    menu = true
+                }
+            },
+        )
+        DropdownMenu(menu && !selecting, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
+            ScribbleMenu(
+                s,
+                onRecolor = { c ->
+                    menu = false
+                    if (c != s.color) actions.recolor(setOf(s.id), c)
+                },
+                onSelect = {
+                    menu = false
+                    actions.startSelecting(s.id)
+                },
+                onDelete = {
+                    menu = false
+                    actions.delete(setOf(s.id))
+                },
+            )
+        }
+    }
+}
+
+/**
+ * What a scribble's long press offers, in the essay card menu's order: the colour dots (not for a photo,
+ * which has no paper to colour), 选择, and 删除 last.
+ */
+@Composable
+internal fun ScribbleMenu(s: Scribble, onRecolor: (NotionColor) -> Unit, onSelect: () -> Unit, onDelete: () -> Unit) {
+    // Two rows of five 48dp dots; the menu takes their width.
+    if (s.photo == null) ColorDots(s.color, onRecolor, Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+    DropdownMenuItem(
+        text = { Text("选择") },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_check_circle), null) },
+        onClick = onSelect,
+    )
+    DropdownMenuItem(
+        text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_delete), null, tint = MaterialTheme.colorScheme.error) },
+        onClick = onDelete,
+    )
 }
 
 @Composable
@@ -156,39 +218,39 @@ private fun TopBar(state: WallState, title: String, actions: WallActions) {
 private fun TopBarRow(state: WallState, title: String, selecting: Boolean, actions: WallActions) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         if (selecting) {
-            IconButton(onClick = actions.stopSelecting) { Icon(Icons.Rounded.Close, "退出选择") }
+            IconButton(onClick = actions.stopSelecting) { Icon(painterResource(R.drawable.ic_sym_close), "退出选择") }
             Text("已选 ${state.selected.size} 条", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
             Pill("全选", null, actions.selectAll)
         } else {
-            IconButton(onClick = actions.close) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
+            IconButton(onClick = actions.close) { Icon(painterResource(R.drawable.ic_sym_back), "返回") }
             Text(title, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
             var sortOpen by remember { mutableStateOf(false) }
             Box {
-                Pill(state.sort.label, Icons.AutoMirrored.Rounded.Sort) { sortOpen = true }
+                Pill(state.sort.label, R.drawable.ic_sym_sort) { sortOpen = true }
                 DropdownMenu(sortOpen, { sortOpen = false }, shape = RoundedCornerShape(20.dp)) {
                     WallSort.entries.forEach { s ->
                         DropdownMenuItem(
                             text = { Text(s.label) },
                             onClick = { sortOpen = false; actions.setSort(s) },
-                            trailingIcon = { if (s == state.sort) Icon(Icons.Rounded.Check, null) },
+                            trailingIcon = { if (s == state.sort) Icon(painterResource(R.drawable.ic_sym_check), null) },
                         )
                     }
                 }
             }
             Spacer(Modifier.width(8.dp))
-            Pill("选择", Icons.Rounded.Check) { actions.startSelecting(null) }
+            Pill("选择", R.drawable.ic_sym_check_circle) { actions.startSelecting(null) }
         }
     }
 }
 
 @Composable
-private fun Pill(label: String, icon: ImageVector?, onClick: () -> Unit) {
+private fun Pill(label: String, @DrawableRes icon: Int?, onClick: () -> Unit) {
     Row(
         Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).clickable(onClick = onClick).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (icon != null) Icon(icon, null, Modifier.height(18.dp))
+        if (icon != null) Icon(painterResource(icon), null, Modifier.height(18.dp))
         Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
@@ -203,13 +265,13 @@ private fun SelectionBar(selected: Set<String>, essays: List<Essay>, actions: Wa
         var colorOpen by remember { mutableStateOf(false) }
         var copyOpen by remember { mutableStateOf(false) }
         Box {
-            BarButton("颜色", Icons.Rounded.Palette, enabled) { colorOpen = true }
+            BarButton("颜色", R.drawable.ic_sym_color, enabled) { colorOpen = true }
             DropdownMenu(colorOpen, { colorOpen = false }, shape = RoundedCornerShape(24.dp)) {
-                ColorDots(null, { actions.recolor(selected, it); colorOpen = false }, Modifier.width(220.dp).padding(14.dp))
+                ColorDots(null, { actions.recolor(selected, it); colorOpen = false }, Modifier.padding(8.dp))
             }
         }
         Box {
-            BarButton("复制到随笔", Icons.Rounded.ContentCopy, enabled) { copyOpen = true }
+            BarButton("复制到随笔", R.drawable.ic_sym_copy, enabled) { copyOpen = true }
             // Second-level menu: a new essay, or one of the existing ones (appended at the end as synced blocks).
             DropdownMenu(copyOpen, { copyOpen = false }, shape = RoundedCornerShape(20.dp)) {
                 Text("复制 ${selected.size} 条到", Modifier.padding(horizontal = 16.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -223,19 +285,20 @@ private fun SelectionBar(selected: Set<String>, essays: List<Essay>, actions: Wa
                 }
             }
         }
-        BarButton("删除", Icons.Rounded.Delete, enabled) { actions.delete(selected) }
+        BarButton("删除", R.drawable.ic_sym_delete, enabled) { actions.delete(selected) }
     }
 }
 
 @Composable
-private fun BarButton(label: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
-    val alpha = if (enabled) 1f else 0.38f
+private fun BarButton(label: String, @DrawableRes icon: Int, enabled: Boolean, onClick: () -> Unit) {
+    // Paperleaf greys nothing with alpha: an unavailable action drops to ink-muted.
+    val ink by animateColorAsState(if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant, LeafMotion.effects(), label = "bar ink")
     Row(
         Modifier.height(48.dp).clip(RoundedCornerShape(24.dp)).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+        Icon(painterResource(icon), null, tint = ink)
+        Text(label, style = MaterialTheme.typography.labelLarge, color = ink)
     }
 }

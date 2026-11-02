@@ -7,7 +7,7 @@ import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 
-/** 记一句 in the quick settings: pull down, tap, type. */
+/** 写一句 in the quick settings: pull down, tap, type. */
 class CaptureTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()

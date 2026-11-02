@@ -119,7 +119,7 @@ class SystemVoiceNoteRecognizer(
                     // Lifting before the recognizer was ready is a stop it rejects, not a failure.
                     error == SpeechRecognizer.ERROR_CLIENT && released -> finish(latest)
                     // The on-device recognizer lacks this language's model: hand over if allowed.
-                    // route() said System for this case, so the permission line already told.
+                    // route() said System for this case, so going online here is what it allowed.
                     useOnDevice && error in LanguageErrors && network -> {
                         missingOnDevice += languageTag
                         useOnDevice = false

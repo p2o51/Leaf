@@ -18,10 +18,13 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 
-/** Pixel's segmented list (Android 16), the same measures as Sheaf's settings: round outside, tight between rows. */
+/**
+ * Pixel's segmented list (Android 16) at Paperleaf's measures, shared with Sheaf: radius-l outside,
+ * radius-inner between rows, space-2 apart.
+ */
 object Segments {
-    val Outer = 20.dp
-    val Inner = 4.dp
+    val Outer = 24.dp
+    val Inner = 6.dp
     val Gap = 2.dp
 }
 
@@ -37,7 +40,8 @@ internal data class SegmentSpan(val top: Int, val bottom: Int)
 @Composable
 fun SegmentedColumn(
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.surfaceContainer,
+    // Segmented rows sit on paper-low (Paperleaf SegmentedGroup).
+    color: Color = MaterialTheme.colorScheme.surfaceContainerLow,
     content: @Composable () -> Unit,
 ) {
     var spans by remember { mutableStateOf(emptyList<SegmentSpan>()) }

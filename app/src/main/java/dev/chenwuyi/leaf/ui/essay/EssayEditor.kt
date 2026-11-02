@@ -62,22 +62,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.List
-import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.Audiotrack
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Movie
-import androidx.compose.material.icons.rounded.PictureAsPdf
-import androidx.compose.material.icons.rounded.CloudDone
-import androidx.compose.material.icons.rounded.CloudOff
-import androidx.compose.material.icons.rounded.DragIndicator
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.HideImage
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -101,7 +85,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -121,6 +104,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
@@ -131,6 +115,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.BlockOrder
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.EssayBlock
@@ -140,6 +125,7 @@ import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.WallRules
 import dev.chenwuyi.leaf.data.sync.SyncStatus
 import dev.chenwuyi.leaf.ui.component.PictureView
+import dev.chenwuyi.leaf.ui.component.scribbleFill
 import dev.chenwuyi.leaf.ui.component.scribbleShape
 import dev.chenwuyi.leaf.ui.theme.EditorBodyStyle
 import dev.chenwuyi.leaf.ui.theme.EditorTitleStyle
@@ -181,6 +167,9 @@ fun EssayEditor(
     start: EditorStart = EditorStart(),
     onOpenFile: (EssayBlock.Attachment) -> Unit = {},
     onSavePhoto: (EssayBlock.Photo) -> Unit = {},
+    // A photo's delete gets its own call: the app holds it back for an undo window, where a block removed
+    // by Backspace is just gone.
+    onRemovePhoto: (String) -> Unit = onRemoveBlock,
 ) {
     // Typing goes to a local draft first: waiting for Room's round trip would drop fast keystrokes.
     var draft by remember(essay.id) { mutableStateOf(essay) }
@@ -219,7 +208,7 @@ fun EssayEditor(
         if (viewing == id) viewing = null
         draft = EditorEdits.remove(draft, id)
         lastEdit = System.currentTimeMillis()
-        onRemoveBlock(id)
+        onRemovePhoto(id)
     }
     val keyboard = LocalSoftwareKeyboardController.current
     val keyboardUp = WindowInsets.isImeVisible
@@ -332,7 +321,7 @@ fun EssayEditor(
         }
     }
     val showTitle by remember { derivedStateOf { list.firstVisibleItemIndex >= 2 } }
-    val fill by animateFloatAsState(solid, LeafMotion.tool(), label = "bar")
+    val fill by animateFloatAsState(solid, LeafMotion.effects(), label = "bar")
 
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest)) {
         // A wide editor pane (a tablet's, beside the list) keeps Craft's side panel instead of the floating bar.
@@ -384,7 +373,9 @@ fun EssayEditor(
                                     clip = false
                                 }
                             } else {
-                                Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = LeafMotion.expressive())
+                                // Blocks re-flow (Enter splitting a paragraph, a neighbour swapping under a drag) in the
+                                // still tempo: no bounce under the text while writing.
+                                Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = LeafMotion.still())
                             }
                             // Photos and rules move on a long press; text keeps its long press for selecting words.
                             val longPressDrag = if (block is EssayBlock.Photo || (block is EssayBlock.Other && BlockOrder.movable(block))) {
@@ -455,9 +446,12 @@ fun EssayEditor(
                                         EssayBlock.Divider -> HorizontalDivider(
                                             longPressDrag.fillMaxWidth().padding(vertical = 14.dp),
                                             thickness = 1.dp,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
+                                            // Paperleaf's rule token, the one hairline it keeps.
+                                            color = MaterialTheme.colorScheme.outlineVariant,
                                         )
-                                        EssayBlock.TableOfContents -> OutlineKey { outlineOpen = true }
+                                        // The bar's 目录 key is the one way to the outline; a second key in the text
+                                        // only made two of them. The block stays in Notion, untouched.
+                                        EssayBlock.TableOfContents -> Unit
                                         else -> Text(
                                             "Notion 里的「${block.type}」块，Leaf 先不改它",
                                             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp),
@@ -469,7 +463,7 @@ fun EssayEditor(
                                 // The text block being edited shows its handle in the margin; dragging it moves the block.
                                 // One holding more in Notion than Leaf can write back (children, formatting) has none.
                                 if (block is EssayBlock.Paragraph && BlockOrder.movable(block)) {
-                                    val handle by animateFloatAsState(if (focused == block.id || dragging) 1f else 0f, LeafMotion.tool(), label = "handle")
+                                    val handle by animateFloatAsState(if (focused == block.id || dragging) 1f else 0f, LeafMotion.effects(), label = "handle")
                                     if (handle > 0f) {
                                         Box(
                                             Modifier
@@ -489,7 +483,7 @@ fun EssayEditor(
                                                 },
                                             contentAlignment = Alignment.Center,
                                         ) {
-                                            Icon(Icons.Rounded.DragIndicator, "拖动这一段", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                                            Icon(painterResource(R.drawable.ic_sym_drag_indicator), "拖动这一段", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
                                 }
@@ -518,8 +512,9 @@ fun EssayEditor(
                         ) {
                             AnimatedVisibility(
                                 panel == ToolPanel.Style,
-                                enter = fadeIn() + scaleIn(LeafMotion.expressive(), initialScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 1f)),
-                                exit = fadeOut() + scaleOut(LeafMotion.tool(), targetScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 1f)),
+                                // Still zone: the card settles without overshoot, its alpha on effects.
+                                enter = fadeIn(LeafMotion.effects()) + scaleIn(LeafMotion.still(), initialScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 1f)),
+                                exit = fadeOut(LeafMotion.effects()) + scaleOut(LeafMotion.still(), targetScale = 0.9f, transformOrigin = TransformOrigin(0.5f, 1f)),
                             ) {
                                 StyleControls(
                                     styling,
@@ -527,7 +522,6 @@ fun EssayEditor(
                                     recolor,
                                     Modifier
                                         .widthIn(max = 460.dp)
-                                        .shadow(8.dp, RoundedCornerShape(28.dp))
                                         .clip(RoundedCornerShape(28.dp))
                                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                         .padding(16.dp),
@@ -535,7 +529,6 @@ fun EssayEditor(
                             }
                             EditorToolbar(
                                 panel = panel,
-                                canStyle = styling != null,
                                 keyboardUp = keyboardUp,
                                 onPanel = { next ->
                                     if (next == ToolPanel.Insert) keyboard?.hide()
@@ -554,9 +547,12 @@ fun EssayEditor(
                 if (!wide) {
                     AnimatedVisibility(
                         panel == ToolPanel.Insert,
-                        enter = expandVertically(LeafMotion.expressive(), expandFrom = Alignment.Top),
-                        exit = shrinkVertically(LeafMotion.tool(), shrinkTowards = Alignment.Top),
+                        enter = expandVertically(LeafMotion.still(), expandFrom = Alignment.Top),
+                        exit = shrinkVertically(LeafMotion.still(), shrinkTowards = Alignment.Top),
                     ) {
+                        // Edge to edge: the sheet and its scrolling rows run under the gesture bar; only the end of
+                        // the rows is padded clear of it (51, 2026-11-02: the rows used to stop short above it).
+                        val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                         InsertGrid(
                             pickable,
                             onPick,
@@ -564,11 +560,11 @@ fun EssayEditor(
                             Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                .navigationBarsPadding()
-                                .heightIn(max = 340.dp)
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
+                                .heightIn(max = 340.dp + navInset)
                                 .verticalScroll(rememberScrollState())
-                                .padding(20.dp),
+                                .padding(20.dp)
+                                .padding(bottom = navInset),
                         )
                     }
                 }
@@ -600,7 +596,7 @@ fun EssayEditor(
                     scope.launch {
                         list.animateScrollToItem(headerItems + at)
                         // Clear of the bar lying over the top of the list.
-                        list.animateScrollBy(-barPx)
+                        list.animateScrollBy(-barPx, LeafMotion.still())
                     }
                 }
             },
@@ -697,14 +693,14 @@ private fun EditorTopBar(
     val disc = if (overCover) surface.copy(alpha = 0.78f * (1f - fill)) else Color.Transparent
     Box(modifier.fillMaxWidth().drawBehind { drawRect(surface.copy(alpha = fill)) }) {
         Row(Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            BarKey(disc, onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
+            BarKey(disc, onBack) { Icon(painterResource(R.drawable.ic_sym_back), "返回") }
             Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
                 val line = flash ?: if (showTitle) title.ifBlank { "无标题" } else ""
                 AnimatedContent(
                     targetState = line to (flash != null),
                     transitionSpec = {
-                        (fadeIn(LeafMotion.tool()) + slideInVertically(LeafMotion.expressive()) { it / 2 }) togetherWith
-                            (fadeOut(LeafMotion.tool()) + slideOutVertically(LeafMotion.tool()) { -it / 2 })
+                        (fadeIn(LeafMotion.effects()) + slideInVertically(LeafMotion.still()) { it / 2 }) togetherWith
+                            (fadeOut(LeafMotion.effects()) + slideOutVertically(LeafMotion.still()) { -it / 2 })
                     },
                     contentAlignment = Alignment.Center,
                     label = "bar line",
@@ -722,14 +718,14 @@ private fun EditorTopBar(
                     }
                 }
             }
-            if (hasOutline) BarKey(disc, onOutline) { Icon(Icons.AutoMirrored.Rounded.List, "目录") }
+            if (hasOutline) BarKey(disc, onOutline) { Icon(painterResource(R.drawable.ic_sym_list), "目录") }
             Box {
                 var menu by remember { mutableStateOf(false) }
-                BarKey(disc, { menu = true }) { Icon(Icons.Rounded.MoreVert, "更多") }
+                BarKey(disc, { menu = true }) { Icon(painterResource(R.drawable.ic_sym_more_vertical), "更多") }
                 DropdownMenu(menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
                         text = { Text(if (hasCover) "换封面" else "添加封面") },
-                        leadingIcon = { Icon(Icons.Rounded.Image, null) },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_image), null) },
                         onClick = {
                             menu = false
                             onPickCover()
@@ -738,7 +734,7 @@ private fun EditorTopBar(
                     if (hasCover) {
                         DropdownMenuItem(
                             text = { Text("移除封面") },
-                            leadingIcon = { Icon(Icons.Rounded.HideImage, null) },
+                            leadingIcon = { Icon(painterResource(R.drawable.ic_sym_image_off), null) },
                             onClick = {
                                 menu = false
                                 onRemoveCover()
@@ -763,8 +759,8 @@ private fun CoverImage(cover: Picture, height: androidx.compose.ui.unit.Dp, onPi
     Box {
         PictureView(cover, Modifier.fillMaxWidth().height(height).clickable(onClickLabel = "封面") { menu = true })
         DropdownMenu(menu, onDismissRequest = { menu = false }, modifier = Modifier) {
-            DropdownMenuItem(text = { Text("换封面") }, leadingIcon = { Icon(Icons.Rounded.Image, null) }, onClick = { menu = false; onPick() })
-            DropdownMenuItem(text = { Text("移除封面") }, leadingIcon = { Icon(Icons.Rounded.HideImage, null) }, onClick = { menu = false; onRemove() })
+            DropdownMenuItem(text = { Text("换封面") }, leadingIcon = { Icon(painterResource(R.drawable.ic_sym_image), null) }, onClick = { menu = false; onPick() })
+            DropdownMenuItem(text = { Text("移除封面") }, leadingIcon = { Icon(painterResource(R.drawable.ic_sym_image_off), null) }, onClick = { menu = false; onRemove() })
         }
     }
 }
@@ -780,22 +776,24 @@ private fun MetaLine(essay: Essay, sync: EditorSync, flash: String?) {
         essay.tags.forEach { tag ->
             Text(
                 tag,
-                Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)).padding(horizontal = 8.dp, vertical = 3.dp),
+                // A tag is a chip, full round on paper-high, as on the essay cards.
+                Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 8.dp, vertical = 3.dp),
                 style = MaterialTheme.typography.labelMedium,
                 color = quiet,
             )
         }
         val (icon, label) = when {
-            !sync.connected -> Icons.Rounded.CloudOff to "示例数据"
-            sync.status is SyncStatus.NeedsAttention -> Icons.Rounded.ErrorOutline to "需要处理"
-            sync.status is SyncStatus.Running || flash == Syncing -> Icons.Rounded.Sync to "同步中"
-            sync.status is SyncStatus.Waiting -> Icons.Rounded.Sync to "稍后同步"
-            else -> Icons.Rounded.CloudDone to "已同步到 Notion"
+            !sync.connected -> R.drawable.ic_sym_cloud_off to "示例数据"
+            sync.status is SyncStatus.NeedsAttention -> R.drawable.ic_sym_error to "需要处理"
+            sync.status is SyncStatus.Running || flash == Syncing -> R.drawable.ic_sym_sync to "同步中"
+            sync.status is SyncStatus.Waiting -> R.drawable.ic_sym_sync to "稍后同步"
+            else -> R.drawable.ic_sym_cloud_done to "已同步到 Notion"
         }
         Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, Modifier.size(13.dp), tint = quiet.copy(alpha = 0.8f))
+            // Ink-muted as it is: Paperleaf greys no text with alpha.
+            Icon(painterResource(icon), null, Modifier.size(13.dp), tint = quiet)
             Spacer(Modifier.width(4.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, color = quiet.copy(alpha = 0.8f))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = quiet)
         }
     }
 }
@@ -803,31 +801,18 @@ private fun MetaLine(essay: Essay, sync: EditorSync, flash: String?) {
 private fun fullDay(day: LocalDate): String =
     if (day.year == LocalDate.now().year) WallRules.dayLabel(day) else "${day.year}年${WallRules.dayLabel(day)}"
 
-/** Notion's table of contents block in the text: a small key that opens the outline from the right. */
-@Composable
-private fun OutlineKey(onClick: () -> Unit) {
-    Row(
-        Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClickLabel = "打开目录", onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.AutoMirrored.Rounded.List, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(6.dp))
-        Text("目录", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
 /** The outline, a sheet pulled in from the right edge over a scrim; a heading takes the page to it. */
 @Composable
 private fun OutlinePanel(open: Boolean, headings: List<EssayBlock.Paragraph>, onDismiss: () -> Unit, onPick: (String) -> Unit) {
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(open, enter = fadeIn(LeafMotion.tool()), exit = fadeOut(LeafMotion.tool())) {
+        AnimatedVisibility(open, enter = fadeIn(LeafMotion.effects()), exit = fadeOut(LeafMotion.effects())) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).clickable(interactionSource = null, indication = null, onClick = onDismiss))
         }
         AnimatedVisibility(
             open,
             Modifier.align(Alignment.CenterEnd),
-            enter = slideInHorizontally(LeafMotion.expressive()) { it },
-            exit = slideOutHorizontally(LeafMotion.tool()) { it },
+            enter = slideInHorizontally(LeafMotion.still()) { it },
+            exit = slideOutHorizontally(LeafMotion.still()) { it },
         ) {
             Column(
                 Modifier
@@ -835,16 +820,16 @@ private fun OutlinePanel(open: Boolean, headings: List<EssayBlock.Paragraph>, on
                     .fillMaxWidth(0.8f)
                     .widthIn(max = 340.dp)
                     .clip(RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
                     .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .padding(vertical = 16.dp),
+                    .padding(top = 16.dp),
             ) {
                 Text("目录", Modifier.padding(horizontal = 24.dp, vertical = 8.dp), style = MaterialTheme.typography.titleMedium)
                 if (headings.isEmpty()) {
                     Text("这篇还没有标题", Modifier.padding(horizontal = 24.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
+                // The list scrolls under the gesture bar; its end is padded clear of it.
+                LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())) {
                     items(headings, key = { it.id }) { h ->
                         val level = when (h.type) { "heading_1" -> 0; "heading_2" -> 1; else -> 2 }
                         Text(
@@ -871,7 +856,7 @@ private fun OutlinePanel(open: Boolean, headings: List<EssayBlock.Paragraph>, on
 @Composable
 private fun SidePanel(tab: SideTab, onTab: (SideTab) -> Unit, modifier: Modifier, content: @Composable (SideTab) -> Unit) {
     Column(
-        modifier.background(MaterialTheme.colorScheme.surfaceContainerLow).statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier.background(MaterialTheme.colorScheme.surfaceContainer).statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(
@@ -895,7 +880,7 @@ private fun SidePanel(tab: SideTab, onTab: (SideTab) -> Unit, modifier: Modifier
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-            AnimatedContent(tab, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "side") { content(it) }
+            AnimatedContent(tab, transitionSpec = { fadeIn(LeafMotion.effects()) togetherWith fadeOut(LeafMotion.effects()) }, label = "side") { content(it) }
         }
     }
 }
@@ -950,7 +935,7 @@ private fun placeholderFor(type: String): String = when (type) {
 @Composable
 private fun PlainField(value: String, placeholder: String, style: TextStyle, modifier: Modifier = Modifier, onValue: (String) -> Unit) {
     Box {
-        if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+        if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
         BasicTextField(
             value,
             onValue,
@@ -985,7 +970,7 @@ private fun PhotoBlock(
                 PhotoMenuItems(block.caption.isNotEmpty(), onCaption = onCaptionStart, onSave = onSave, onDelete = onRemove)
             }
         }
-        AnimatedVisibility(captionOpen, enter = fadeIn(LeafMotion.tool()) + expandVertically(LeafMotion.expressive()), exit = fadeOut(LeafMotion.tool()) + shrinkVertically(LeafMotion.tool())) {
+        AnimatedVisibility(captionOpen, enter = fadeIn(LeafMotion.effects()) + expandVertically(LeafMotion.still()), exit = fadeOut(LeafMotion.effects()) + shrinkVertically(LeafMotion.still())) {
             PlainField(block.caption, "写一句标注", MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), captionModifier, onCaption)
         }
     }
@@ -995,31 +980,33 @@ private fun PhotoBlock(
 @Composable
 private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: () -> Unit, onPick: (Scribble) -> Unit) {
     val tones = LocalNotionTones.current
+    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(open, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(open, enter = fadeIn(LeafMotion.effects()), exit = fadeOut(LeafMotion.effects())) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).clickable(interactionSource = null, indication = null, onClick = onDismiss))
         }
         AnimatedVisibility(
             open,
-            Modifier.align(Alignment.BottomCenter),
-            enter = fadeIn() + expandVertically(LeafMotion.expressive(), expandFrom = Alignment.Bottom),
-            exit = fadeOut() + shrinkVertically(LeafMotion.tool(), shrinkTowards = Alignment.Bottom),
+            // A writing width on tablets, as the capture sheet has, instead of edge to edge.
+            Modifier.align(Alignment.BottomCenter).widthIn(max = 640.dp),
+            enter = fadeIn(LeafMotion.effects()) + expandVertically(LeafMotion.still(), expandFrom = Alignment.Bottom),
+            exit = fadeOut(LeafMotion.effects()) + shrinkVertically(LeafMotion.still(), shrinkTowards = Alignment.Bottom),
         ) {
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 480.dp)
-                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .navigationBarsPadding()
-                    .padding(20.dp),
+                    .heightIn(max = 480.dp + navInset)
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(start = 20.dp, top = 20.dp, end = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text("插入涂鸦", style = MaterialTheme.typography.titleMedium)
                 if (scribbles.isEmpty()) {
                     Text("涂鸦墙还是空的", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // The rows scroll under the gesture bar; the list's end is padded clear of it.
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 20.dp + navInset)) {
                     items(scribbles, key = { it.id }) { s ->
                         Row(
                             Modifier.fillMaxWidth().clip(scribbleShape(s)).background(tones.fill(s.color)).clickable { onPick(s) }.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -1041,10 +1028,10 @@ private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: 
 @Composable
 private fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
     val icon = when (block.type) {
-        "pdf" -> Icons.Rounded.PictureAsPdf
-        "video" -> Icons.Rounded.Movie
-        "audio" -> Icons.Rounded.Audiotrack
-        else -> Icons.Rounded.Description
+        "pdf" -> R.drawable.ic_sym_pdf
+        "video" -> R.drawable.ic_sym_movie
+        "audio" -> R.drawable.ic_sym_audiotrack
+        else -> R.drawable.ic_sym_article
     }
     val kind = when (block.type) {
         "pdf" -> "PDF"
@@ -1066,19 +1053,18 @@ private fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
             Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Icon(painterResource(icon), null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
         }
         Column(Modifier.weight(1f)) {
             Text(block.name.ifBlank { "附件" }, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(kind, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(Icons.AutoMirrored.Rounded.OpenInNew, "打开", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(painterResource(R.drawable.ic_sym_open_in_new), "打开", tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun SyncedScribbleBlock(scribble: Scribble?) {
-    val tones = LocalNotionTones.current
     if (scribble == null) {
         Text(
             "原涂鸦已删除",
@@ -1088,13 +1074,14 @@ private fun SyncedScribbleBlock(scribble: Scribble?) {
         return
     }
     Column(
-        Modifier.fillMaxWidth().clip(scribbleShape(scribble)).background(tones.fill(scribble.color)).padding(horizontal = 16.dp, vertical = 12.dp),
+        // On the page a scribble is the same paper-container leaf as on the wall.
+        Modifier.fillMaxWidth().clip(scribbleShape(scribble)).background(scribbleFill(scribble)).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         scribble.photo?.let { PictureView(it, Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(16.dp))) }
         if (scribble.text.isNotBlank()) Text(scribble.text, style = EditorBodyStyle.copy(fontSize = EditorBodyStyle.fontSize * 0.9f))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Sync, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(painterResource(R.drawable.ic_sym_sync), null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 " 同步块 · 涂鸦墙 " + WallRules.dayLabel(scribble.createdAt.atZone(ZoneId.systemDefault()).toLocalDate()),
                 style = MaterialTheme.typography.labelSmall,

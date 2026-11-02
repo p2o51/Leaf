@@ -20,18 +20,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Login
-import androidx.compose.material.icons.rounded.BugReport
-import androidx.compose.material.icons.rounded.DarkMode
-import androidx.compose.material.icons.rounded.TextFields
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Key
-import androidx.compose.material.icons.rounded.LinkOff
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.Storage
-import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chenwuyi.leaf.BuildConfig
 import dev.chenwuyi.leaf.CrashLog
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.notion.NotionCredential
 import dev.chenwuyi.leaf.data.settings.Connection
 import dev.chenwuyi.leaf.data.settings.ReadingFont
@@ -83,7 +73,7 @@ fun SettingsScreen(vm: SettingsViewModel, onClose: () -> Unit, modifier: Modifie
     // anything that is not a control (the bar's empty middle) fell through to home's search bar below.
     Column(modifier.fillMaxSize().pointerInput(Unit) {}.background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.padding(horizontal = 8.dp).column(bleed = 8.dp).padding(end = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
+            IconButton(onClick = onClose) { Icon(painterResource(R.drawable.ic_sym_back), "返回") }
             Spacer(Modifier.width(4.dp))
             Text(
                 "设置",
@@ -127,9 +117,9 @@ private fun NotionGroup(vm: SettingsViewModel, connection: Connection?, status: 
             else -> syncLine(connection, status)
         }
         SettingsSection("Notion") {
-            SettingsRow(Icons.Rounded.Storage, connection.databaseName, detail = connection.workspace)
-            ActionRow(Icons.Rounded.Sync, "立即同步", value = value, onClick = vm::sync)
-            ActionRow(Icons.Rounded.LinkOff, "断开连接", titleColor = MaterialTheme.colorScheme.error, onClick = vm::disconnect)
+            SettingsRow(R.drawable.ic_sym_dataset, connection.databaseName, detail = connection.workspace)
+            ActionRow(R.drawable.ic_sym_sync, "立即同步", value = value, onClick = vm::sync)
+            ActionRow(R.drawable.ic_sym_link_off, "断开连接", titleColor = MaterialTheme.colorScheme.error, onClick = vm::disconnect)
         }
         if (problem != null) {
             SettingsHint(problem, if (status is SyncStatus.NeedsAttention) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -143,10 +133,10 @@ private fun NotionGroup(vm: SettingsViewModel, connection: Connection?, status: 
             if (!useToken) {
                 val context = LocalContext.current
                 SettingsSection("Notion") {
-                    ActionRow(Icons.AutoMirrored.Rounded.Login, "用 Notion 登录", value = if (step.busy) "正在连接…" else null, enabled = !step.busy) {
+                    ActionRow(R.drawable.ic_sym_login, "用 Notion 登录", value = if (step.busy) "正在连接…" else null, enabled = !step.busy) {
                         openInBrowser(context, vm.signInUrl())
                     }
-                    ActionRow(Icons.Rounded.Key, "改用集成密钥", enabled = !step.busy) { useToken = true }
+                    ActionRow(R.drawable.ic_sym_key, "改用集成密钥", enabled = !step.busy) { useToken = true }
                 }
                 if (step.error != null) SettingsHint(step.error, MaterialTheme.colorScheme.error)
                 SettingsHint("在 Notion 的授权页勾上要用的数据库，回来再选一个。凭据只存在这台设备的加密存储里。")
@@ -157,7 +147,7 @@ private fun NotionGroup(vm: SettingsViewModel, connection: Connection?, status: 
                         SecretField(token, { token = it }, "ntn_…")
                         Button(onClick = { vm.discover(token) }, enabled = token.isNotBlank() && !step.busy) { Text(if (step.busy) "正在检查…" else "下一步") }
                     }
-                    if (vm.signInAvailable) ActionRow(Icons.AutoMirrored.Rounded.Login, "改用 Notion 登录", enabled = !step.busy) { useToken = false }
+                    if (vm.signInAvailable) ActionRow(R.drawable.ic_sym_login, "改用 Notion 登录", enabled = !step.busy) { useToken = false }
                 }
                 if (step.error != null) SettingsHint(step.error, MaterialTheme.colorScheme.error)
                 SettingsHint("在 notion.so/profile/integrations 新建内部集成，在数据库的 ··· › 连接 里选上它，再把密钥贴在这里。密钥只存在这台设备的加密存储里。")
@@ -166,10 +156,10 @@ private fun NotionGroup(vm: SettingsViewModel, connection: Connection?, status: 
         is ConnectStep.Pick -> {
             SettingsSection("选一个数据库 · ${step.workspace}") {
                 step.sources.forEach { source ->
-                    ActionRow(Icons.Rounded.Storage, source.name, value = "${source.properties.size} 个字段", enabled = !step.busy) { vm.connect(source) }
+                    ActionRow(R.drawable.ic_sym_dataset, source.name, value = "${source.properties.size} 个字段", enabled = !step.busy) { vm.connect(source) }
                 }
                 val again = if (step.credential is NotionCredential.OAuth) "重新登录" else "换一个密钥"
-                ActionRow(Icons.AutoMirrored.Rounded.ArrowBack, again, enabled = !step.busy, onClick = vm::back)
+                ActionRow(R.drawable.ic_sym_back, again, enabled = !step.busy, onClick = vm::back)
             }
             if (step.error != null) SettingsHint(step.error, MaterialTheme.colorScheme.error)
             SettingsHint(if (step.busy) "正在连接…" else "Leaf 会补上缺的字段，并在里面找或新建一行「涂鸦墙」。")
@@ -182,12 +172,12 @@ private fun AppearanceGroup(vm: SettingsViewModel) {
     val appearance by vm.appearance.collectAsStateWithLifecycle()
     SettingsSection("外观") {
         ChoiceRow(
-            Icons.Rounded.TextFields, "正文字体", ReadingFont.entries, appearance.font, { it.label },
+            R.drawable.ic_sym_text_size, "正文字体", ReadingFont.entries, appearance.font, { it.label },
             onPick = { vm.setAppearance(appearance.copy(font = it)) },
             // Each choice is set in the face it picks.
             face = { font -> MaterialTheme.typography.labelLarge.merge(TextStyle(fontFamily = if (font == ReadingFont.Sans) GoogleSansFlex else FontFamily.Serif)) },
         )
-        ChoiceRow(Icons.Rounded.DarkMode, "深浅色", ThemeMode.entries, appearance.theme, { it.label }, onPick = { vm.setAppearance(appearance.copy(theme = it)) })
+        ChoiceRow(R.drawable.ic_sym_dark_mode, "深浅色", ThemeMode.entries, appearance.theme, { it.label }, onPick = { vm.setAppearance(appearance.copy(theme = it)) })
     }
 }
 
@@ -198,10 +188,10 @@ private fun VoiceGroup(vm: SettingsViewModel) {
     var text by rememberSaveable { mutableStateOf("") }
     val saved = masked
     SettingsSection("按住说") {
-        SettingsRow(Icons.Rounded.Mic, "转写", value = if (saved != null) "ElevenLabs" else "本机识别")
+        SettingsRow(R.drawable.ic_sym_mic, "转写", value = if (saved != null) "ElevenLabs" else "本机识别")
         if (saved != null) {
-            SettingsRow(Icons.Rounded.Key, "ElevenLabs 密钥", value = saved)
-            ActionRow(Icons.Rounded.LinkOff, "移除密钥", titleColor = MaterialTheme.colorScheme.error, onClick = vm::clearSpeechKey)
+            SettingsRow(R.drawable.ic_sym_key, "ElevenLabs 密钥", value = saved)
+            ActionRow(R.drawable.ic_sym_link_off, "移除密钥", titleColor = MaterialTheme.colorScheme.error, onClick = vm::clearSpeechKey)
         } else {
             PanelBlock("ElevenLabs 密钥") {
                 SecretField(text, { text = it }, "sk_…")
@@ -221,8 +211,8 @@ private fun AboutGroup() {
     val context = LocalContext.current
     var crash by remember { mutableStateOf(CrashLog.read(context)) }
     SettingsSection("关于") {
-        SettingsRow(Icons.Rounded.Info, "版本", value = "${BuildConfig.VERSION_NAME} · ${BuildConfig.GIT_HASH}")
-        ActionRow(Icons.Rounded.BugReport, "复制崩溃日志", value = if (crash == null) "没有" else "有一份", enabled = crash != null) {
+        SettingsRow(R.drawable.ic_sym_info, "版本", value = "${BuildConfig.VERSION_NAME} · ${BuildConfig.GIT_HASH}")
+        ActionRow(R.drawable.ic_sym_bug, "复制崩溃日志", value = if (crash == null) "没有" else "有一份", enabled = crash != null) {
             crash?.let { copy(context, it) }
             CrashLog.clear(context)
             crash = null

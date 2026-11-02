@@ -1,5 +1,6 @@
 package dev.chenwuyi.leaf.ui.home
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -21,12 +22,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.PhotoCamera
-import androidx.compose.material.icons.automirrored.rounded.ShortText
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -45,22 +39,26 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.ui.capture.holdToTalk
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
+import dev.chenwuyi.leaf.ui.theme.LocalLeafAccents
 
 // No hint under the labels: menus carry no explanations (51's Do/Don't, 2026-10-24). The colour already
-// tells the scribbles (primary) from the essay (tertiary).
-enum class AddKind(val label: String, val icon: ImageVector) {
-    Photo("拍照", Icons.Rounded.PhotoCamera),
-    Voice("语音", Icons.Rounded.Mic),
-    Text("文本", Icons.AutoMirrored.Rounded.ShortText),
-    Essay("随笔", Icons.Rounded.Edit),
+// tells the scribbles (primary) from the essay (tertiary). The names are the ones the launcher shortcuts,
+// the widget and the quick settings tile use too, so each way in is called the same everywhere.
+enum class AddKind(val label: String, @DrawableRes val icon: Int) {
+    Photo("拍照", R.drawable.ic_sym_photo_camera),
+    Voice("说一句", R.drawable.ic_sym_mic),
+    Text("写一句", R.drawable.ic_sym_short_text),
+    Essay("随笔", R.drawable.ic_sym_essay),
 }
 
 /**
@@ -78,7 +76,7 @@ fun AddMenu(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
-        AnimatedVisibility(expanded, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(expanded, enter = fadeIn(LeafMotion.effects()), exit = fadeOut(LeafMotion.effects())) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -94,8 +92,9 @@ fun AddMenu(
             AddKind.entries.forEachIndexed { index, kind ->
                 AnimatedVisibility(
                     expanded,
-                    enter = fadeIn() + scaleIn(LeafMotion.fast(), initialScale = 0.8f) + slideInVertically(LeafMotion.expressive()) { it / 2 * (AddKind.entries.size - index) },
-                    exit = fadeOut() + scaleOut(targetScale = 0.8f) + slideOutVertically { it / 2 },
+                    // Home is the lively zone: the pills spring in; every fade is on effects.
+                    enter = fadeIn(LeafMotion.effects()) + scaleIn(LeafMotion.livelyFast(), initialScale = 0.8f) + slideInVertically(LeafMotion.lively()) { it / 2 * (AddKind.entries.size - index) },
+                    exit = fadeOut(LeafMotion.effects()) + scaleOut(LeafMotion.livelyFast(), targetScale = 0.8f) + slideOutVertically(LeafMotion.lively()) { it / 2 },
                 ) {
                     MenuItem(kind) { onExpandedChange(false); onPick(kind) }
                 }
@@ -103,8 +102,10 @@ fun AddMenu(
             val haptics = LocalHapticFeedback.current
             val rotation by animateFloatAsState(if (expanded) 45f else 0f, LeafMotion.fast(), label = "plus")
             val corner by androidx.compose.animation.core.animateDpAsState(if (expanded) 38.dp else 26.dp, LeafMotion.fast(), label = "corner")
-            val container = if (expanded) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.tertiaryContainer
-            val content = if (expanded) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onTertiaryContainer
+            // Paperleaf's lime, the same + as the editor's: open or closed it keeps its colour, and the MD3E
+            // morph (round to rounded-square, a 45° turn) alone says which.
+            val container = LocalLeafAccents.current.lime
+            val content = LocalLeafAccents.current.onLime
             Box(
                 Modifier
                     .padding(top = 4.dp)
@@ -115,7 +116,7 @@ fun AddMenu(
                         role = Role.Button
                         onClick("新建") { onExpandedChange(!expanded); true }
                         // Without a finger to hold, a long press only opens the voice sheet; its mic does the rest.
-                        onLongClick("语音") { onExpandedChange(false); onPick(AddKind.Voice); true }
+                        onLongClick(AddKind.Voice.label) { onExpandedChange(false); onPick(AddKind.Voice); true }
                     }
                     // Keyboard and D-pad: the custom gesture below handles touch only, so Enter opens the menu.
                     .onKeyEvent { event ->
@@ -135,7 +136,7 @@ fun AddMenu(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.Add, contentDescription = "新建：点一下选，长按直接说", Modifier.size(34.dp).rotate(rotation), tint = content)
+                Icon(painterResource(R.drawable.ic_sym_add), contentDescription = "新建：点一下选，长按直接说", Modifier.size(34.dp).rotate(rotation), tint = content)
             }
         }
     }
@@ -156,7 +157,7 @@ private fun MenuItem(kind: AddKind, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(kind.icon, contentDescription = null, tint = fg)
+        Icon(painterResource(kind.icon), contentDescription = null, tint = fg)
         Text(kind.label, style = MaterialTheme.typography.titleMedium, color = fg)
     }
 }

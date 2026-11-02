@@ -1,7 +1,6 @@
 package dev.chenwuyi.leaf.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,12 +30,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.DropdownMenu
@@ -44,7 +37,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
@@ -52,7 +44,6 @@ import androidx.compose.material3.SearchBarState
 import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSearchBarState
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,7 +59,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.HomeFilter
 import dev.chenwuyi.leaf.data.NotionColor
@@ -96,7 +89,6 @@ fun HomePane(
     activeEssayId: String?,
     onOpenWall: (focusId: String?, near: Set<String>) -> Unit,
     onOpenEssay: (String) -> Unit,
-    onOpenSettings: () -> Unit,
     onOpenDrawer: () -> Unit,
     modifier: Modifier = Modifier,
     actions: EssayActions = EssayActions(),
@@ -109,7 +101,7 @@ fun HomePane(
         snapshotFlow { bar.currentValue }.collect { if (it == SearchBarValue.Collapsed) text.setTextAndPlaceCursorAtEnd("") }
     }
     val sorted = WallRules.searchEssays(essays, "")
-    val inputField: @Composable () -> Unit = { SearchField(text, bar, onOpenSettings, onOpenDrawer) }
+    val inputField: @Composable () -> Unit = { SearchField(text, bar, onOpenDrawer) }
 
     BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.surface)) {
         val columns = when {
@@ -118,11 +110,14 @@ fun HomePane(
             else -> 4
         }
         val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val side = if (maxWidth < 600.dp) 16.dp else 24.dp
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Fixed(columns),
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = top + 10.dp, bottom = 130.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalItemSpacing = 10.dp,
+            // Paperleaf spacing: a phone's 16dp side margin (24 on wider windows), 8 between the cards of
+            // one group, and 24 plus a title-s label between groups.
+            contentPadding = PaddingValues(start = side, end = side, top = top + 10.dp, bottom = 130.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalItemSpacing = 8.dp,
         ) {
             item(key = "search", span = StaggeredGridItemSpan.FullLine) {
                 SearchBar(
@@ -139,12 +134,12 @@ fun HomePane(
             }
             // The strip shows only when there is something on it: no scribbles, no strip and no placeholder.
             if (scribbles.isNotEmpty()) {
-                item(key = "strip", span = StaggeredGridItemSpan.FullLine) { ScribbleStrip(scribbles, onOpenWall, bleed = 12.dp) }
+                item(key = "strip", span = StaggeredGridItemSpan.FullLine) { ScribbleStrip(scribbles, onOpenWall, bleed = side) }
             }
             if (all || sorted.isNotEmpty()) {
                 item(key = "essays-title", span = StaggeredGridItemSpan.FullLine) {
                     // A quiet section label, not a page title: the cards are what the eye should land on.
-                    Text("随笔", Modifier.padding(start = 6.dp, top = 6.dp).animateItem(), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("随笔", Modifier.padding(start = 4.dp, top = 16.dp).animateItem(), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (all && sorted.isEmpty()) {
@@ -166,7 +161,9 @@ fun HomePane(
     ExpandedFullScreenSearchBar(
         state = bar,
         inputField = inputField,
-        colors = SearchBarDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        // The open search page is a page, so it is paper: its cards and scribbles sit on paper-container
+        // and would vanish on paper-high.
+        colors = SearchBarDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         SearchResults(
             query = text.text.toString(),
@@ -186,10 +183,13 @@ fun HomePane(
     }
 }
 
-/** M3's input field. Collapsed it carries Leaf's mark (settings) at the end; open, the magnifier turns into back. */
+/**
+ * M3's input field. Collapsed, its end is left empty: settings moved into the drawer, and a mark there
+ * read as a button. Open, the menu key turns into back.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenSettings: () -> Unit, onOpenDrawer: () -> Unit) {
+private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenDrawer: () -> Unit) {
     val scope = rememberCoroutineScope()
     val expanded = bar.targetValue == SearchBarValue.Expanded
     val turn by animateFloatAsState(if (expanded) 1f else 0f, LeafMotion.fast(), label = "lead")
@@ -199,27 +199,19 @@ private fun SearchField(text: TextFieldState, bar: SearchBarState, onOpenSetting
         onSearch = {},
         placeholder = { Text("搜索随笔和涂鸦") },
         leadingIcon = {
-            // Collapsed, the leading icon opens the drawer, as in Keep; open, it turns into back.
+            // Collapsed, the leading icon opens the drawer, as in Keep; open, it turns into back. The drawer
+            // holds settings as well as the colours and tags, so its key says both.
             IconButton(onClick = { if (expanded) scope.launch { bar.animateToCollapsed() } else onOpenDrawer() }) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Menu, if (expanded) null else "分类", Modifier.graphicsLayer { alpha = 1f - turn; rotationZ = 90f * turn })
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, if (expanded) "关闭搜索" else null, Modifier.graphicsLayer { alpha = turn; rotationZ = -90f * (1f - turn) })
+                    Icon(painterResource(R.drawable.ic_sym_menu), if (expanded) null else "分类和设置", Modifier.graphicsLayer { alpha = 1f - turn; rotationZ = 90f * turn })
+                    Icon(painterResource(R.drawable.ic_sym_back), if (expanded) "关闭搜索" else null, Modifier.graphicsLayer { alpha = turn; rotationZ = -90f * (1f - turn) })
                 }
             }
         },
-        trailingIcon = {
-            if (expanded) {
-                if (text.text.isNotEmpty()) IconButton(onClick = { text.setTextAndPlaceCursorAtEnd("") }) { Icon(Icons.Rounded.Close, "清空") }
-            } else {
-                // Leaf's mark, the cookie shape, where an avatar would sit. Settings open from here.
-                Box(
-                    Modifier.padding(end = 4.dp).size(34.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable(onClickLabel = "设置", onClick = onOpenSettings),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("L", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-            }
+        trailingIcon = if (expanded) {
+            { if (text.text.isNotEmpty()) IconButton(onClick = { text.setTextAndPlaceCursorAtEnd("") }) { Icon(painterResource(R.drawable.ic_sym_close), "清空") } }
+        } else {
+            null
         },
     )
 }
@@ -231,7 +223,7 @@ private fun SearchResults(query: String, scribbles: List<Scribble>, essays: List
     val hitScribbles = WallRules.search(scribbles, query).sortedByDescending { it.createdAt }
     val hitEssays = WallRules.searchEssays(essays, query)
     // A centred reading width on tablets, rather than results stretched across the whole screen.
-    LazyColumn(Modifier.fillMaxSize().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.fillMaxSize().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (hitScribbles.isEmpty() && hitEssays.isEmpty()) {
             item(key = "none") { Text("没有找到「${query.trim()}」", Modifier.padding(8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
@@ -269,7 +261,7 @@ private fun FilterTitle(filter: HomeFilter, modifier: Modifier = Modifier) {
 
 @Composable
 private fun ResultTitle(label: String) {
-    Text(label, Modifier.padding(start = 4.dp, top = 14.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(label, Modifier.padding(start = 4.dp, top = 16.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /** What a long press on an essay card can do. */
@@ -307,11 +299,12 @@ private fun ManagedEssayCard(essay: Essay, active: Boolean, onOpen: () -> Unit, 
                     menu = false
                     if (c != essay.color) actions.recolor(essay, c)
                 },
-                Modifier.widthIn(max = 232.dp).padding(horizontal = 14.dp, vertical = 8.dp),
+                // Two rows of five 48dp dots; the menu takes their width.
+                Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             )
             DropdownMenuItem(
                 text = { Text(if (essay.pinned) "取消置顶" else "置顶") },
-                leadingIcon = { Icon(Icons.Rounded.PushPin, null) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_sym_pin), null) },
                 onClick = {
                     menu = false
                     actions.setPinned(essay, !essay.pinned)
@@ -319,7 +312,7 @@ private fun ManagedEssayCard(essay: Essay, active: Boolean, onOpen: () -> Unit, 
             )
             DropdownMenuItem(
                 text = { Text("删除", color = MaterialTheme.colorScheme.error) },
-                leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_sym_delete), null, tint = MaterialTheme.colorScheme.error) },
                 onClick = {
                     menu = false
                     actions.delete(essay)

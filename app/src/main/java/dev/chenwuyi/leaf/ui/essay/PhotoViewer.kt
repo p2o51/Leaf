@@ -24,12 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,37 +49,39 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import dev.chenwuyi.leaf.R
 import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.ui.component.PictureView
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
 import androidx.compose.material3.DropdownMenu
 
 /**
- * The same three actions wherever a photo offers a menu: the ⋯ in the viewer and a long press in the page.
+ * The same three actions wherever a photo offers a menu: the ⋮ in the viewer and a long press in the page.
  * 标注 is the photo's caption in Notion.
  */
 @Composable
 internal fun PhotoMenuItems(hasCaption: Boolean, onCaption: () -> Unit, onSave: () -> Unit, onDelete: () -> Unit) {
     DropdownMenuItem(
         text = { Text(if (hasCaption) "编辑标注" else "添加标注") },
-        leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_edit), null) },
         onClick = onCaption,
     )
     DropdownMenuItem(
         text = { Text("保存图片") },
-        leadingIcon = { Icon(Icons.Rounded.Download, null) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_download), null) },
         onClick = onSave,
     )
     DropdownMenuItem(
         text = { Text("删除图片", color = MaterialTheme.colorScheme.error) },
-        leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_sym_delete), null, tint = MaterialTheme.colorScheme.error) },
         onClick = onDelete,
     )
 }
 
 /**
- * A photo on its own, filling the screen: pinch or double tap to zoom, ⋯ (or a long press) for its menu,
+ * A photo on its own, filling the screen: pinch or double tap to zoom, ⋮ (or a long press) for its menu,
  * and its 标注 under it when it has one. [photo] null closes it.
  */
 @Composable
@@ -105,8 +101,9 @@ internal fun PhotoViewer(
 
     AnimatedVisibility(
         photo != null,
-        enter = fadeIn(LeafMotion.tool()) + scaleIn(LeafMotion.expressive(), initialScale = 0.92f),
-        exit = fadeOut(LeafMotion.tool()) + scaleOut(LeafMotion.tool(), targetScale = 0.92f),
+        // Looking at a photo is reading too: it opens without overshoot, its fade on effects.
+        enter = fadeIn(LeafMotion.effects()) + scaleIn(LeafMotion.still(), initialScale = 0.92f),
+        exit = fadeOut(LeafMotion.effects()) + scaleOut(LeafMotion.still(), targetScale = 0.92f),
     ) {
         val current = shown ?: return@AnimatedVisibility
         Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -115,10 +112,10 @@ internal fun PhotoViewer(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Disc(onDismiss) { Icon(Icons.Rounded.Close, "关闭", tint = Color.White) }
+                Disc(onDismiss) { Icon(painterResource(R.drawable.ic_sym_close), "关闭", tint = Color.White) }
                 Spacer(Modifier.weight(1f))
                 Box {
-                    Disc({ menu = true }) { Icon(Icons.Rounded.MoreHoriz, "更多", tint = Color.White) }
+                    Disc({ menu = true }) { Icon(painterResource(R.drawable.ic_sym_more_vertical), "更多", tint = Color.White) }
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
                         PhotoMenuItems(
                             hasCaption = current.caption.isNotEmpty(),
@@ -138,7 +135,7 @@ internal fun PhotoViewer(
 private fun ZoomablePicture(photo: EssayBlock.Photo, onLongPress: () -> Unit) {
     var scale by remember(photo.id) { mutableFloatStateOf(1f) }
     var pan by remember(photo.id) { mutableStateOf(Offset.Zero) }
-    val shownScale by animateFloatAsState(scale, LeafMotion.tool(), label = "zoom")
+    val shownScale by animateFloatAsState(scale, LeafMotion.still(), label = "zoom")
     Box(
         Modifier
             .fillMaxSize()
