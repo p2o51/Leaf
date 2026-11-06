@@ -6,7 +6,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -96,17 +97,19 @@ fun EditorToolbar(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         val inserting = panel == ToolPanel.Insert
-        val corner by animateDpAsState(if (inserting) 14.dp else 22.dp, LeafMotion.fast(), label = "plus")
+        // Concentric with the bar: the bar is a pill and its padding is even, so the + is a circle too
+        // (a rounded square inside a pill looked like two shapes). Open, it turns into × rather than morphing.
+        val turn by animateFloatAsState(if (inserting) 45f else 0f, LeafMotion.fast(), label = "plus")
         Box(
             Modifier
                 .size(44.dp)
-                .clip(RoundedCornerShape(corner))
+                .clip(CircleShape)
                 .background(if (inserting) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary)
                 .clickable(role = Role.Button) { onPanel(if (inserting) ToolPanel.None else ToolPanel.Insert) }
                 .semantics { contentDescription = "插入"; selected = inserting },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.Add, null, tint = if (inserting) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary)
+            Icon(Icons.Rounded.Add, null, Modifier.rotate(turn), tint = if (inserting) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onPrimary)
         }
         Spacer(Modifier.width(4.dp))
         ToolButton(Icons.Rounded.TextFields, "样式", on = panel == ToolPanel.Style, enabled = canStyle) {

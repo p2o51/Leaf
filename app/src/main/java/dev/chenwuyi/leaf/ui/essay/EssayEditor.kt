@@ -6,6 +6,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -511,8 +512,11 @@ fun EssayEditor(
                         modifier = Modifier.align(Alignment.TopCenter),
                     )
                     if (!wide) {
+                        // With the insert grid up, the grid covers the navigation bar, so the bar drops its own
+                        // inset; it moves on the grid's spring rather than jumping.
+                        val barNav by animateDpAsState(if (panel == ToolPanel.Insert) 0.dp else navBottom, LeafMotion.tool(), label = "barNav")
                         Column(
-                            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 12.dp, vertical = 10.dp),
+                            Modifier.align(Alignment.BottomCenter).padding(bottom = barNav).padding(horizontal = 12.dp, vertical = 10.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
@@ -557,6 +561,9 @@ fun EssayEditor(
                         enter = expandVertically(LeafMotion.expressive(), expandFrom = Alignment.Top),
                         exit = shrinkVertically(LeafMotion.tool(), shrinkTowards = Alignment.Top),
                     ) {
+                        // Edge to edge: the grid scrolls on under the gesture bar instead of stopping short of it,
+                        // and only its last row is padded clear of the bar.
+                        val gridNav = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                         InsertGrid(
                             pickable,
                             onPick,
@@ -565,10 +572,9 @@ fun EssayEditor(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                .navigationBarsPadding()
-                                .heightIn(max = 340.dp)
+                                .heightIn(max = 340.dp + gridNav)
                                 .verticalScroll(rememberScrollState())
-                                .padding(20.dp),
+                                .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 20.dp + gridNav),
                         )
                     }
                 }

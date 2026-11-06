@@ -58,6 +58,14 @@ class HomeScreenshots {
     @Config(qualifiers = "w1280dp-h800dp-land-night-xhdpi")
     fun tablet_tag() = shoot("home-tablet-2-tag-dark") { home(HomeFilter.ByTag("写作"), drawerOpen = false) }
 
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun phone_loading() = shoot("home-phone-5-loading") { LeafTheme { HomePane(emptyList(), emptyList(), HomeFilter.All, emptyList(), emptyList(), null, { _, _ -> }, {}, {}, {}, loading = true) } }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-night-xhdpi")
+    fun phone_loading_dark() = shoot("home-phone-6-loading-dark") { LeafTheme { HomePane(emptyList(), emptyList(), HomeFilter.All, emptyList(), emptyList(), null, { _, _ -> }, {}, {}, {}, loading = true) } }
+
     @Composable
     private fun home(filter: HomeFilter, drawerOpen: Boolean) = LeafTheme {
         val scribbles = SampleData.scribbles
