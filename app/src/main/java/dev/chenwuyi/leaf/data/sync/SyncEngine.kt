@@ -328,9 +328,10 @@ class SyncEngine(
                 batch.map { r -> async { r to notion.children(token, r.pageId, limit = 8).mapNotNull(NotionJson::bodyBlock).filter { it.editable }
                     .joinToString(" ") { it.text }.trim().take(400) } }.awaitAll()
             }
-            // An edit made in Leaf while the batch was out wins: that essay waits for the next pull.
+            // An edit made in Leaf while the batch was out wins: that essay waits for the next pull. A delete
+            // is queued under the page ID, and writing the row back would bring the card back from the dead.
             val nowWaiting = pending()
-            dao.upsertEssays(previews.filter { (r, _) -> ids.getValue(r.pageId) !in nowWaiting }.map { (r, preview) -> entity(r, preview) })
+            dao.upsertEssays(previews.filter { (r, _) -> ids.getValue(r.pageId) !in nowWaiting && r.pageId !in nowWaiting }.map { (r, preview) -> entity(r, preview) })
         }
 
         val remoteIds = rows.map { it.pageId }.toSet()
