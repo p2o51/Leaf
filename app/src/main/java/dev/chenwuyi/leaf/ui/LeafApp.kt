@@ -76,7 +76,10 @@ import dev.chenwuyi.leaf.ui.home.EssayActions
 import dev.chenwuyi.leaf.ui.home.HomeDrawer
 import dev.chenwuyi.leaf.ui.home.HomePane
 import dev.chenwuyi.leaf.ui.theme.LeafMotion
+import dev.chenwuyi.leaf.ui.settings.ConnectStep
 import dev.chenwuyi.leaf.ui.settings.SettingsScreen
+import dev.chenwuyi.leaf.data.sync.ConnectPhase
+import dev.chenwuyi.leaf.data.sync.SyncStatus
 import dev.chenwuyi.leaf.ui.settings.SettingsViewModel
 import dev.chenwuyi.leaf.ui.wall.WallActions
 import dev.chenwuyi.leaf.ui.wall.WallScreen
@@ -100,6 +103,16 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
     val syncStatus by settings.status.collectAsStateWithLifecycle()
     // Saveable, so a theme switch or rotation keeps the page, menu or sheet open instead of dropping to home.
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    val connectPhase by settings.connectPhase.collectAsStateWithLifecycle()
+    val connectStep by settings.step.collectAsStateWithLifecycle()
+    // Once a database is picked, settings has nothing more to say: home takes over with its loading page.
+    // A connect that fails brings settings back, where the error is.
+    LaunchedEffect(connectPhase) { if (connectPhase != ConnectPhase.Idle) settingsOpen = false }
+    LaunchedEffect(connectStep) { if ((connectStep as? ConnectStep.Pick)?.error != null) settingsOpen = true }
+    // The samples never show while Notion is loading, and an empty home while the first pull runs is a
+    // loading page, not "还没有随笔".
+    val loading = connectPhase == ConnectPhase.Preparing ||
+        (allScribbles.isEmpty() && allEssays.isEmpty() && (connectPhase == ConnectPhase.Pulling || (connection != null && syncStatus is SyncStatus.Running)))
 
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -247,18 +260,22 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
                                                 vm::openEssay, { settingsOpen = true }, { scope.launch { drawer.open() } },
                                                 Modifier.fillMaxSize(),
                                                 actions = essayActions,
+                                                loading = loading,
                                             )
-                                            AddMenu(
-                                                menuOpen,
-                                                { menuOpen = it },
-                                                onAdd,
-                                                onHoldStart = {
-                                                    capture = Capture.Voice
-                                                    // Without the permission the sheet opens and its mic asks first.
-                                                    if (context.canRecord()) voice.press()
-                                                },
-                                                onHoldEnd = voice::lift,
-                                            )
+                                            // Nothing to add to while Notion is loading: what is written then could land in the samples about to go.
+                                            AnimatedVisibility(!loading, Modifier.fillMaxSize(), enter = fadeIn(LeafMotion.tool()), exit = fadeOut(LeafMotion.tool())) {
+                                                AddMenu(
+                                                    menuOpen,
+                                                    { menuOpen = it },
+                                                    onAdd,
+                                                    onHoldStart = {
+                                                        capture = Capture.Voice
+                                                        // Without the permission the sheet opens and its mic asks first.
+                                                        if (context.canRecord()) voice.press()
+                                                    },
+                                                    onHoldEnd = voice::lift,
+                                                )
+                                            }
                                         }
                                     },
                                     editorKey = openEssay?.id,

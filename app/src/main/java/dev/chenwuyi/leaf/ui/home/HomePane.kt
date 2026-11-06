@@ -62,6 +62,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridScope
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -100,6 +110,7 @@ fun HomePane(
     onOpenDrawer: () -> Unit,
     modifier: Modifier = Modifier,
     actions: EssayActions = EssayActions(),
+    loading: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     val bar = rememberSearchBarState()
@@ -131,6 +142,10 @@ fun HomePane(
                     colors = SearchBarDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+            if (loading) {
+                loadingItems(columns)
+                return@LazyVerticalStaggeredGrid
             }
             val all = filter == HomeFilter.All
             // A filter names itself where the page starts, the way Keep titles a label, and back clears it.
@@ -184,6 +199,51 @@ fun HomePane(
             },
         )
     }
+}
+
+/**
+ * Home while Notion is loading: the page's own shape (strip, then cards) in quiet placeholders and one
+ * line saying what is happening, so the person never sees the sample essays or an empty "还没有随笔".
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun LazyStaggeredGridScope.loadingItems(columns: Int) {
+    item(key = "loading-line", span = StaggeredGridItemSpan.FullLine) {
+        Row(Modifier.padding(start = 6.dp, top = 4.dp, bottom = 4.dp).animateItem(), verticalAlignment = Alignment.CenterVertically) {
+            LoadingIndicator(Modifier.size(28.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("正在从 Notion 取回随笔和涂鸦…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    item(key = "loading-strip", span = StaggeredGridItemSpan.FullLine) {
+        val pulse = rememberPulse()
+        Column(Modifier.animateItem(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(listOf(150, 110, 180), listOf(120, 170, 90), listOf(160, 100, 140)).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { w -> Placeholder(Modifier.width(w.dp).height(40.dp), CircleShape, pulse) }
+                }
+            }
+        }
+    }
+    item(key = "loading-title", span = StaggeredGridItemSpan.FullLine) {
+        Text("随笔", Modifier.padding(start = 6.dp, top = 6.dp).animateItem(), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    val heights = listOf(220, 150, 180, 240, 140, 200, 170, 210)
+    items(minOf(heights.size, columns * 3), key = { "loading-card-$it" }) { i ->
+        Placeholder(Modifier.fillMaxWidth().height(heights[i % heights.size].dp).animateItem(), RoundedCornerShape(24.dp), rememberPulse())
+    }
+}
+
+/** A soft breathing alpha shared by the placeholders; colour and alpha may tween (LeafMotion). */
+@Composable
+private fun rememberPulse(): Float {
+    val transition = rememberInfiniteTransition(label = "loading")
+    val alpha by transition.animateFloat(0.55f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse")
+    return alpha
+}
+
+@Composable
+private fun Placeholder(modifier: Modifier, shape: Shape, alpha: Float) {
+    Box(modifier.graphicsLayer { this.alpha = alpha }.clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh))
 }
 
 /** M3's input field. Collapsed it carries Leaf's mark (settings) at the end; open, the magnifier turns into back. */

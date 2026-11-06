@@ -16,9 +16,13 @@ import dev.chenwuyi.leaf.data.notion.NotionException
 import dev.chenwuyi.leaf.data.notion.NotionFailure
 import dev.chenwuyi.leaf.data.notion.NotionJson
 import dev.chenwuyi.leaf.data.notion.PropertyInfo
+import dev.chenwuyi.leaf.data.notion.RemoteRow
 import dev.chenwuyi.leaf.data.settings.Connection
 import dev.chenwuyi.leaf.data.settings.ConnectionStore
 import java.util.UUID
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +40,9 @@ sealed interface SyncStatus {
 }
 
 enum class RunResult { Done, RetryLater, Stopped }
+
+/** Previews fetched side by side; the client still spaces their starts to Notion's three a second. */
+private const val PreviewBatch = 3
 
 /**
  * Moves changes between Room and Notion. Push drains the outbox in order; pull mirrors the wall page
@@ -274,23 +281,27 @@ class SyncEngine(
         if (gone.isNotEmpty()) dao.deleteScribbles(gone)
     }
 
+    /**
+     * Two passes, so a first pull shows every essay at once instead of one card per Notion round trip.
+     * First, essays new to Leaf go in with their title, cover and tags but no preview yet, and the ones
+     * Leaf already has wait (their old card stays right until its new preview is in). Then the previews
+     * are fetched, newest first, a few at a time, and each card fills in as its preview arrives. A new
+     * essay whose preview never came (the run was cut short) still has a blank one, so it is asked for
+     * again next time.
+     */
     private suspend fun pullEssays(token: String, c: Connection) {
         val rows = notion.rows(token, source(c)).filter { !it.isWall && it.pageId != c.wallPageId }
         val waiting = pending()
         val local = dao.allEssays().filter { !it.sample }
         val byPage = local.filter { it.pageId != null }.associateBy { it.pageId }
-        for (r in rows) {
-            // Deleted in Leaf and not yet trashed in Notion: pulling it back would undo the delete.
-            if (r.pageId in waiting) continue
+        // Deleted in Leaf and not yet trashed in Notion: pulling it back would undo the delete.
+        val incoming = rows.filter { r -> r.pageId !in waiting && byPage[r.pageId]?.id !in waiting }
+        val ids = incoming.associate { r -> r.pageId to (byPage[r.pageId]?.id ?: newId()) }
+        fun entity(r: RemoteRow, preview: String): EssayEntity {
             val mine = byPage[r.pageId]
-            if (mine != null && mine.id in waiting) continue
             val changed = mine == null || mine.editedAt != r.editedAt.toEpochMilli()
-            val preview = if (changed) {
-                notion.children(token, r.pageId, limit = 8).mapNotNull(NotionJson::bodyBlock).filter { it.editable }
-                    .joinToString(" ") { it.text }.trim().take(400)
-            } else mine!!.preview
-            dao.upsertEssays(listOf(EssayEntity(
-                id = mine?.id ?: newId(),
+            return EssayEntity(
+                id = ids.getValue(r.pageId),
                 pageId = r.pageId,
                 title = r.title,
                 color = r.color.apiName,
@@ -301,8 +312,27 @@ class SyncEngine(
                 bodyLoaded = mine?.bodyLoaded == true && !changed,
                 tags = tagColumn(r.tags),
                 createdAt = r.createdAt?.toEpochMilli() ?: mine?.createdAt,
-            )))
+            )
         }
+        val needPreview = incoming.filter { r ->
+            val mine = byPage[r.pageId]
+            mine == null || mine.editedAt != r.editedAt.toEpochMilli() || (mine.preview.isBlank() && !mine.bodyLoaded)
+        }
+        val fresh = needPreview.filter { byPage[it.pageId] == null }
+        if (fresh.isNotEmpty()) dao.upsertEssays(fresh.map { entity(it, "") })
+        val unchanged = incoming - needPreview.toSet()
+        if (unchanged.isNotEmpty()) dao.upsertEssays(unchanged.map { entity(it, byPage.getValue(it.pageId).preview) })
+
+        for (batch in needPreview.sortedByDescending { it.editedAt }.chunked(PreviewBatch)) {
+            val previews = coroutineScope {
+                batch.map { r -> async { r to notion.children(token, r.pageId, limit = 8).mapNotNull(NotionJson::bodyBlock).filter { it.editable }
+                    .joinToString(" ") { it.text }.trim().take(400) } }.awaitAll()
+            }
+            // An edit made in Leaf while the batch was out wins: that essay waits for the next pull.
+            val nowWaiting = pending()
+            dao.upsertEssays(previews.filter { (r, _) -> ids.getValue(r.pageId) !in nowWaiting }.map { (r, preview) -> entity(r, preview) })
+        }
+
         val remoteIds = rows.map { it.pageId }.toSet()
         val gone = local.filter { it.pageId != null && it.pageId !in remoteIds && it.id !in waiting }.map { it.id }
         if (gone.isNotEmpty()) {

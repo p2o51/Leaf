@@ -342,4 +342,26 @@ class SyncEngineTest {
         engine.run()
         assertEquals(java.time.Instant.parse("2026-10-20T08:00:00Z"), repo.essays.first().single().createdAt)
     }
+
+    @Test
+    fun should_fill_every_preview_when_many_essays_are_pulled_at_once() = runBlocking {
+        (1..7).forEach { i ->
+            fake.rows += fake.row("p$i", "第 $i 篇", "随笔", edited = "2026-10-2${i}T00:00:00.000Z")
+            fake.children["p$i"] = mutableListOf(fake.paragraph("x$i", "第 $i 篇的开头"))
+        }
+        engine.run()
+        val essays = repo.essays.first().associateBy { it.title }
+        assertEquals(7, essays.size)
+        (1..7).forEach { i -> assertEquals("第 $i 篇的开头", essays.getValue("第 $i 篇").previewText) }
+    }
+
+    @Test
+    fun should_ask_again_for_a_preview_when_a_new_essay_never_got_one() = runBlocking {
+        // A first pull cut short after the essay went in but before its preview came back.
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, java.time.Instant.parse("2026-10-21T00:00:00Z").toEpochMilli())))
+        fake.rows += fake.row("p1", "东京第三天", "随笔")
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上在路口站了一会儿"))
+        engine.run()
+        assertEquals("早上在路口站了一会儿", repo.essays.first().single().previewText)
+    }
 }
