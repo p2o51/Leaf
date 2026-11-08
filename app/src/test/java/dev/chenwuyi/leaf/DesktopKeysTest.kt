@@ -1,8 +1,11 @@
 package dev.chenwuyi.leaf
 
+import android.content.res.Configuration
 import android.view.KeyEvent
 import dev.chenwuyi.leaf.ui.component.DesktopCommand
 import dev.chenwuyi.leaf.ui.component.DesktopKeys
+import dev.chenwuyi.leaf.ui.component.InputMode
+import dev.chenwuyi.leaf.ui.component.InputModes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -39,5 +42,12 @@ class DesktopKeysTest {
     fun should_list_each_shortcut_once_when_the_helper_reads_them() {
         val keys = DesktopKeys.shortcuts.map { it.keyCode to it.shift }
         assertEquals(keys.size, keys.toSet().size)
+    }
+
+    @Test
+    fun should_be_desktop_mode_only_when_a_hardware_keyboard_is_attached() {
+        assertEquals(InputMode.Desktop, InputModes.from(Configuration.KEYBOARD_QWERTY, Configuration.HARDKEYBOARDHIDDEN_NO))
+        assertEquals(InputMode.Tablet, InputModes.from(Configuration.KEYBOARD_QWERTY, Configuration.HARDKEYBOARDHIDDEN_YES))
+        assertEquals(InputMode.Tablet, InputModes.from(Configuration.KEYBOARD_NOKEYS, Configuration.HARDKEYBOARDHIDDEN_YES))
     }
 }

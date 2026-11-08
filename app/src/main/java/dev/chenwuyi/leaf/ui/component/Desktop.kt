@@ -1,7 +1,12 @@
 package dev.chenwuyi.leaf.ui.component
 
+import android.content.res.Configuration
 import android.view.KeyEvent
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -38,6 +43,29 @@ object DesktopKeys {
     fun isBack(keyCode: Int, ctrl: Boolean, shift: Boolean, alt: Boolean): Boolean =
         keyCode == KeyEvent.KEYCODE_ESCAPE && !ctrl && !shift && !alt
 }
+
+/**
+ * 51's rule (2026-11-08): a hardware keyboard attached = 电脑模式 (keyboard first, Markdown and shortcuts),
+ * none = 平板模式 (dragging first, Markdown second). Phones are 平板模式 too unless a keyboard is plugged in.
+ */
+enum class InputMode { Tablet, Desktop }
+
+object InputModes {
+    fun from(keyboard: Int, hardKeyboardHidden: Int): InputMode =
+        if (keyboard == Configuration.KEYBOARD_QWERTY && hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO) InputMode.Desktop
+        else InputMode.Tablet
+}
+
+/**
+ * The current [InputMode]. Read from the configuration, so plugging or unplugging a keyboard recomposes
+ * (the activity handles keyboard config changes itself instead of being recreated).
+ */
+val inputMode: InputMode
+    @Composable @ReadOnlyComposable
+    get() = LocalInputModeOverride.current ?: LocalConfiguration.current.let { InputModes.from(it.keyboard, it.hardKeyboardHidden) }
+
+/** Tests and previews pin a mode here; null = follow the hardware. */
+val LocalInputModeOverride = staticCompositionLocalOf<InputMode?> { null }
 
 /**
  * Carries shortcuts from the activity, which sees every key the focused text field did not take, to the
