@@ -14,12 +14,13 @@ export struct EssayPage {
   /** null follows the keyboard; true / false is this visit's own choice. */
   @State override: boolean | null = null;
 
-  private get desk(): boolean {
+  /** A method, not a getter: the ArkUI transform drops getters declared in a struct. */
+  private desk(): boolean {
     return this.override ?? this.deskMode;
   }
 
   build() {
-    if (this.desk) {
+    if (this.desk()) {
       DeskEditor({
         essayId: this.essayId,
         onBack: () => this.onBack(),

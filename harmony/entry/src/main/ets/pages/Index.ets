@@ -61,11 +61,12 @@ struct Index {
     this.connected = LeafApp.lib.settings.connection() !== null;
   }
 
-  private get wide(): boolean {
+  /** A method, not a getter: the ArkUI transform drops getters declared in a struct. */
+  private isWide(): boolean {
     return this.winWidth >= WIDE;
   }
 
-  private get visible(): Essay[] {
+  private visibleEssays(): Essay[] {
     return this.essays.filter((e: Essay) => TagRules.matches(e, this.filter));
   }
 
@@ -80,7 +81,7 @@ struct Index {
 
   private pick(f: HomeFilter): void {
     this.filter = f;
-    if (!this.wide) {
+    if (!this.isWide()) {
       this.drawer = false;
     }
   }
@@ -202,7 +203,7 @@ struct Index {
   Main() {
     Stack({ alignContent: Alignment.BottomEnd }) {
       Column() {
-        if (!this.wide) {
+        if (!this.isWide()) {
           Row() {
             Text('☰').fontSize(22).padding(10).onClick(() => {
               this.drawer = true;
@@ -216,11 +217,11 @@ struct Index {
           .width('100%')
           .padding({ left: 8, right: 16, top: 8 })
         }
-        if (!this.loading && this.visible.length === 0) {
+        if (!this.loading && this.visibleEssays().length === 0) {
           this.Empty()
         } else {
           WaterFlow() {
-            ForEach(this.visible, (e: Essay) => {
+            ForEach(this.visibleEssays(), (e: Essay) => {
               FlowItem() {
                 this.Card(e)
               }
@@ -269,11 +270,11 @@ struct Index {
 
   build() {
     Navigation(this.nav) {
-      SideBarContainer(this.wide ? SideBarContainerType.Embed : SideBarContainerType.Overlay) {
+      SideBarContainer(this.isWide() ? SideBarContainerType.Embed : SideBarContainerType.Overlay) {
         this.Sidebar()
         this.Main()
       }
-      .showSideBar(this.wide || this.drawer)
+      .showSideBar(this.isWide() || this.drawer)
       .showControlButton(false)
       .sideBarWidth(260)
       .minSideBarWidth(220)
@@ -281,7 +282,7 @@ struct Index {
       .autoHide(false)
       .divider({ strokeWidth: 0 })
       .onChange((shown: boolean) => {
-        if (!this.wide) {
+        if (!this.isWide()) {
           this.drawer = shown;
         }
       })
