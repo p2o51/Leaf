@@ -54,10 +54,13 @@ final class EditorController: NSObject, NSTextViewDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(recenter), name: NSView.frameDidChangeNotification, object: scrollView)
     }
 
-    /// Keep the 640 pt text column centred however wide the window is.
+    /// Keep the text column (640 pt at most) centred however wide the window is.
     @objc func recenter() {
+        // Narrower than the column plus margins: the column shrinks and lines wrap, never clip.
         let width = scrollView.contentSize.width
-        textView.textContainerInset = NSSize(width: max(24, (width - 640) / 2), height: 80)
+        let column = min(640, max(200, width - 48))
+        textView.textContainer?.containerSize = NSSize(width: column, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainerInset = NSSize(width: max(24, (width - column) / 2), height: 80)
     }
 
     @objc func focusOff() { setFocus(.off) }
