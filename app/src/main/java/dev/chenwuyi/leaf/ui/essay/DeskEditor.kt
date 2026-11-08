@@ -235,9 +235,17 @@ internal fun DeskEditor(
     }
 
     LaunchedEffect(essay.id) {
+        // The words show at once; 来源 marks follow when the file is read, on runs not yet typed into.
+        adopt(essay, emptyMap())
         val spans = originStore.load(essay.id)
+        runs.values.toList().forEach { run ->
+            if (run.value.text != run.written) return@forEach
+            val rendered = DeskText.render(run.blocks)
+            runs[run.key] = run.copy(origins = DeskOrigins.lay(rendered.text.length, rendered.starts, run.blocks.map { spans[it.id].orEmpty() }))
+        }
         stored = spans
-        adopt(essay, spans)
+        // Words typed before the marks were read are written now (writing waits for the marks).
+        if (runs.values.any { it.value.text != it.written }) lastEdit = System.currentTimeMillis()
     }
 
     // Writes every run whose text moved since the last write: blocks to Room (and the outbox), marks to the device.
@@ -417,6 +425,8 @@ internal fun DeskEditor(
                                     hits = if (styleOn) run.hits else emptyList(),
                                     focus = when {
                                         focusMode == DeskFocusMode.Off -> null
+                                        // Nothing fades until 51 puts the cursor somewhere.
+                                        active == null -> null
                                         !isActive -> IntRange.EMPTY
                                         focusMode == DeskFocusMode.Sentence -> DeskFocus.sentence(run.value.text, run.value.selection.start)
                                         else -> DeskFocus.paragraph(run.value.text, run.value.selection.start)
