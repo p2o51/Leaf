@@ -1,6 +1,10 @@
 package dev.chenwuyi.leaf
 
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.KeyboardShortcutGroup
+import android.view.KeyboardShortcutInfo
+import android.view.Menu
 import android.graphics.Color
 import android.os.Build
 import androidx.activity.ComponentActivity
@@ -19,9 +23,41 @@ import dev.chenwuyi.leaf.data.notion.NotionOAuthSession
 import dev.chenwuyi.leaf.ui.LeafApp
 import dev.chenwuyi.leaf.ui.LeafViewModel
 import dev.chenwuyi.leaf.ui.settings.SettingsViewModel
+import dev.chenwuyi.leaf.ui.component.DesktopCommands
+import dev.chenwuyi.leaf.ui.component.DesktopKeys
 import dev.chenwuyi.leaf.ui.theme.LeafTheme
 
 class MainActivity : ComponentActivity() {
+    private val desktop = DesktopCommands()
+
+    // Ctrl shortcuts reach the activity only when the focused field (the editor, search) did not use the
+    // key, so Ctrl+N inside a paragraph still makes a new essay but text editing keys are never stolen.
+    override fun onKeyShortcut(keyCode: Int, event: KeyEvent): Boolean {
+        val command = DesktopKeys.command(keyCode, event.isCtrlPressed, event.isShiftPressed, event.isAltPressed)
+        if (command != null && desktop.send(command)) return true
+        return super.onKeyShortcut(keyCode, event)
+    }
+
+    // Esc = back on Googlebook and other keyboards: it goes through the same BackHandlers as the gesture,
+    // so it closes the top sheet, the wall, settings or the open essay, in that order.
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (DesktopKeys.isBack(keyCode, event.isCtrlPressed, event.isShiftPressed, event.isAltPressed)) {
+            onBackPressedDispatcher.onBackPressed()
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    // Meta + / shows the system's shortcut helper; list Leaf's own there.
+    override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
+        super.onProvideKeyboardShortcuts(data, menu, deviceId)
+        val items = DesktopKeys.shortcuts.map { s ->
+            val meta = KeyEvent.META_CTRL_ON or (if (s.shift) KeyEvent.META_SHIFT_ON else 0)
+            KeyboardShortcutInfo(s.label, s.keyCode, meta)
+        } + KeyboardShortcutInfo("返回 / 关闭", KeyEvent.KEYCODE_ESCAPE, 0)
+        data.add(KeyboardShortcutGroup("Leaf", items))
+    }
+
     override fun onStart() {
         super.onStart()
         // Pull what changed in Notion while Leaf was away.
@@ -48,7 +84,7 @@ class MainActivity : ComponentActivity() {
                         appearanceStore = container.appearance,
                     )
                 }
-                LeafApp(vm, settings)
+                LeafApp(vm, settings, desktop)
             }
         }
     }

@@ -62,7 +62,7 @@ fun ScribbleChip(
     }
     var m = modifier.clip(shape)
     if (ring != null) m = m.border(ring.first, ring.second, shape)
-    m = m.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    m = m.onSecondaryClick(onLongClick).combinedClickable(onClick = onClick, onLongClick = onLongClick)
     val photo = scribble.photo
     if (photo != null) {
         Box(m.size(if (large) 150.dp else 88.dp, if (large) 110.dp else 64.dp), contentAlignment = Alignment.BottomStart) {
