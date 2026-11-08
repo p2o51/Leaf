@@ -1,6 +1,6 @@
 import { DIVIDER, Essay, EssayBlock } from '../core/Models';
 import { DataSourceInfo, Json, LeafSchema, NotionJson, PropertyInfo, RemoteBlock, RemoteRow, TEXT_TYPES } from '../core/NotionJson';
-import { OutboxOp, SyncRules } from '../core/SyncRules';
+import { OutboxOp, PendingOp, SyncRules } from '../core/SyncRules';
 import { OutboxRow } from './LeafDb';
 import { Library, Listener, newId } from './Library';
 import { LeafNotion, NotionError, NotionFailure } from './NotionApi';
@@ -253,7 +253,11 @@ export class SyncEngine {
     return created[0];
   }
 
-  /** Writes a dragged block again after its new neighbour, and only then deletes the old one. */
+  /**
+   * Writes a dragged or restyled block again after its new neighbour, and only then removes the old one.
+   * The old block's delete is queued as its own op the moment the copy is linked, so a failed delete is
+   * retried by Notion id instead of being lost when this op runs again with the new id.
+   */
   private async moveBlock(token: string, localId: string): Promise<boolean> {
     const row = await this.lib.db.block(localId);
     if (row === null) {
@@ -269,7 +273,7 @@ export class SyncEngine {
     const pageId = await this.pageOf(localId);
     const created = await this.appendInPlace(token, pageId, row);
     if (created.length > 0) {
-      await this.notion.deleteBlock(token, old);
+      await this.lib.db.enqueue([new PendingOp(OutboxOp.DeleteBlock, old)]);
     }
     return true;
   }

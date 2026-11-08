@@ -42,6 +42,12 @@ test('should_moveOnlyTheDraggedBlock_when_tabletReorders', () => {
   assert.deepEqual(ops.map((o) => `${o.op}:${o.targetId}`), [`${OutboxOp.MoveBlock}:d`]);
 });
 
+test('should_rewriteSyncedBlock_when_itsTypeChanges', () => {
+  const before = [synced('a', 'A', '标题'), EssayBlock.paragraph('n1', '还没发')];
+  const after = [before[0].withText('标题', 'heading_2'), before[1].withText('还没发', 'quote')];
+  assert.deepEqual(SyncRules.opsFor(before, after).map((o) => `${o.op}:${o.targetId}`), ['move_block:a', 'save_block:n1']);
+});
+
 test('should_notDeleteUnsentBlock_when_itIsRemoved', () => {
   const before = [synced('a', 'A', '一'), EssayBlock.paragraph('n1', '还没发')];
   assert.equal(SyncRules.opsFor(before, [before[0]]).length, 0);

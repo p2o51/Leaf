@@ -78,7 +78,7 @@ export class SyncRules {
   /**
    * The outbox entries an edit needs, from the body before and after it: changed or new blocks are
    * saved, blocks that left are deleted by their Notion id (a block never sent has nothing to delete),
-   * and a block whose place among the others changed is moved. Shown-only blocks are never touched.
+   * and a block whose place among the others changed, or whose type changed, is written again (moved). Shown-only blocks are never touched.
    */
   static opsFor(before: EssayBlock[], after: EssayBlock[]): PendingOp[] {
     const ops: PendingOp[] = [];
@@ -97,7 +97,9 @@ export class SyncRules {
       const prev = old.get(b.id);
       if (prev === undefined) {
         ops.push(new PendingOp(OutboxOp.SaveBlock, b.id));
-      } else if (moved.has(b.id)) {
+      } else if (moved.has(b.id) || (prev.type !== b.type && b.blockId.length > 0)) {
+        // Notion cannot change a block's type in place, so a restyled block is written again where it
+        // stands and the old one deleted, the same route as a drag.
         ops.push(new PendingOp(OutboxOp.MoveBlock, b.id));
       } else if (prev.contentDiffers(b)) {
         ops.push(new PendingOp(OutboxOp.SaveBlock, b.id));
