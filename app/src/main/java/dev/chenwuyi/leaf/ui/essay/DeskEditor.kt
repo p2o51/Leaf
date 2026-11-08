@@ -206,7 +206,15 @@ internal fun DeskEditor(
 
     var title by remember(essay.id) { mutableStateOf(essay.title) }
     var parts by remember(essay.id) { mutableStateOf(DeskText.parts(essay.blocks)) }
-    val runs = remember(essay.id) { mutableStateMapOf<String, DeskRun>() }
+    // Laid out in the first composition, so the words are there on the first frame.
+    val runs = remember(essay.id) {
+        mutableStateMapOf<String, DeskRun>().apply {
+            DeskText.parts(essay.blocks).filterIsInstance<DeskPart.Text>().forEach { part ->
+                val rendered = DeskText.render(part.blocks)
+                put(part.key, DeskRun(part.key, part.blocks, TextFieldValue(rendered.text, TextRange(rendered.text.length)), List(rendered.text.length) { Origin.Typed }, rendered.text))
+            }
+        }
+    }
     var stored by remember(essay.id) { mutableStateOf<Map<String, List<OriginSpan>>?>(null) }
     var active by remember(essay.id) { mutableStateOf<String?>(null) }
     var lastEdit by remember(essay.id) { mutableLongStateOf(0L) }
@@ -236,7 +244,6 @@ internal fun DeskEditor(
 
     LaunchedEffect(essay.id) {
         // The words show at once; 来源 marks follow when the file is read, on runs not yet typed into.
-        adopt(essay, emptyMap())
         val spans = originStore.load(essay.id)
         runs.values.toList().forEach { run ->
             if (run.value.text != run.written) return@forEach
