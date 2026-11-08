@@ -291,7 +291,7 @@ export struct TabletEditor {
           .onMove((from: number, to: number) => this.move(from, to))
         ListItem() {
           // Tapping under the last block starts a new one there, as on paper.
-          Blank().height(160).width('100%').onClick(() => this.addAfter(this.rows.length - 1))
+          Column().height(160).width('100%').onClick(() => this.addAfter(this.rows.length - 1))
         }
       }
       .width('100%')

@@ -1,4 +1,4 @@
-import { ConfigurationConstant } from '@kit.AbilityKit';
+import { resourceManager } from '@kit.LocalizationKit';
 import { Essay, FilterKind, HomeFilter, NotionColor } from '../core/Models';
 import { TagRules } from '../core/Tags';
 import { LeafApp } from '../data/LeafApp';
@@ -21,7 +21,7 @@ struct Index {
   @Provide('leafNav') nav: NavPathStack = new NavPathStack();
   @State essays: Essay[] = [];
   @State filter: HomeFilter = HomeFilter.All;
-  @State width: number = 0;
+  @State winWidth: number = 0;
   @State drawer: boolean = false;
   @State status: string = '';
   @State connected: boolean = false;
@@ -53,7 +53,7 @@ struct Index {
   /** The 写作台 draws faded ink as explicit colours, so it needs to know the colour mode. */
   private trackDarkMode(): void {
     const mode = this.getUIContext().getHostContext()?.resourceManager.getConfigurationSync().colorMode;
-    AppStorage.setOrCreate<boolean>('leaf.dark', mode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
+    AppStorage.setOrCreate<boolean>('leaf.dark', mode === resourceManager.ColorMode.DARK);
   }
 
   private refresh(): void {
@@ -62,7 +62,7 @@ struct Index {
   }
 
   private get wide(): boolean {
-    return this.width >= WIDE;
+    return this.winWidth >= WIDE;
   }
 
   private get visible(): Essay[] {
@@ -226,7 +226,7 @@ struct Index {
               }
             }, (e: Essay) => `${e.id}:${e.editedAt}:${e.color.apiName}:${e.pinned}`)
           }
-          .columnsTemplate(this.width >= 1200 ? '1fr 1fr 1fr 1fr' : (this.width >= 600 ? '1fr 1fr 1fr' : '1fr 1fr'))
+          .columnsTemplate(this.winWidth >= 1200 ? '1fr 1fr 1fr 1fr' : (this.winWidth >= 600 ? '1fr 1fr 1fr' : '1fr 1fr'))
           .columnsGap(12)
           .rowsGap(12)
           .padding({ left: 16, right: 16, top: 16, bottom: 96 })
@@ -291,7 +291,7 @@ struct Index {
     .hideToolBar(true)
     .navDestination(this.Pages)
     .onAreaChange((_: Area, area: Area) => {
-      this.width = Number(area.width);
+      this.winWidth = Number(area.width);
     })
   }
 }
