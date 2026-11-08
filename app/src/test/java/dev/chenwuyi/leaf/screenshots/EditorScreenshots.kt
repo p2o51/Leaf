@@ -82,7 +82,7 @@ class EditorScreenshots {
 
     @Test
     @Config(qualifiers = "w1280dp-h800dp-land-xhdpi")
-    fun desk() = shoot("desk-1") { desk() }
+    fun desk_light() = shoot("desk-1") { desk() }
 
     @Test
     @Config(qualifiers = "w1280dp-h800dp-land-night-xhdpi")
