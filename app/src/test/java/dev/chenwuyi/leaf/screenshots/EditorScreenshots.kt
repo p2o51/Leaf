@@ -7,10 +7,13 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import dev.chenwuyi.leaf.data.Essay
 import dev.chenwuyi.leaf.data.EssayBlock
 import dev.chenwuyi.leaf.data.NotionColor
 import dev.chenwuyi.leaf.data.SampleData
+import dev.chenwuyi.leaf.ui.component.InputMode
+import dev.chenwuyi.leaf.ui.component.LocalInputModeOverride
 import dev.chenwuyi.leaf.ui.essay.EditorStart
 import dev.chenwuyi.leaf.ui.essay.EditorSync
 import dev.chenwuyi.leaf.ui.essay.EssayEditor
@@ -76,6 +79,22 @@ class EditorScreenshots {
     @Test
     @Config(qualifiers = "w870dp-h800dp-land-xhdpi")
     fun tablet_style() = shoot("tablet-2-style") { editor(EditorStart(focus = "p1", styleTab = true)) }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp-land-xhdpi")
+    fun desk_light() = shoot("desk-1") { desk() }
+
+    @Test
+    @Config(qualifiers = "w1280dp-h800dp-land-night-xhdpi")
+    fun desk_dark() = shoot("desk-2-dark") { desk() }
+
+    // 电脑模式: the same essay as one Markdown text on the 写作台.
+    @Composable
+    private fun desk() = LeafTheme {
+        CompositionLocalProvider(LocalInputModeOverride provides InputMode.Desktop) {
+            EssayEditor(essay, SampleData.scribbles, EditorSync(connected = true), {}, {}, {})
+        }
+    }
 
     @Composable
     private fun editor(start: EditorStart) = LeafTheme {

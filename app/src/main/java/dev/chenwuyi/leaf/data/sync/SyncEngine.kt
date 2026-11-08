@@ -319,19 +319,29 @@ class SyncEngine(
     }
 
     /** Loads one essay's body unless it is loaded already or has edits still waiting to go out. */
-    suspend fun loadBody(essayId: String): Unit = mutex.withLock {
+    suspend fun loadBody(essayId: String): Unit = fetchBody(essayId, again = false)
+
+    /**
+     * Fetches the body of the essay open in the 写作台 again, so edits made elsewhere (Notion, the Mac)
+     * reach the open window. Only that one page is fetched, and only while nothing of it waits to go out.
+     */
+    suspend fun refreshBody(essayId: String): Unit = fetchBody(essayId, again = true)
+
+    private suspend fun fetchBody(essayId: String, again: Boolean): Unit = mutex.withLock {
         val c = store.connection.value ?: return@withLock
         val token = store.token() ?: return@withLock
         val essay = dao.essay(essayId) ?: return@withLock
         val pageId = essay.pageId ?: return@withLock
-        if (essay.bodyLoaded) return@withLock
+        if (essay.bodyLoaded && !again) return@withLock
         val waiting = pending()
         if (essayId in waiting || dao.blocksOf(essayId).any { it.id in waiting }) return@withLock
         val before = dao.blocksOf(essayId)
         val blocks = try { auth.withToken(token) { notion.essayBody(it, pageId) } } catch (_: NotionException) { return@withLock }
         // Blocks already known keep their local ID, so an edit made from the old list still lands on them.
         val known = before.filter { it.blockId != null }.associate { it.blockId to it.id }
-        val rows = blocks.mapIndexed { i, b ->
+        // A block deleted here whose DeleteBlock has not gone out yet is still in Notion; its op targets
+        // the Notion block ID, so drop it from the fetched body rather than bring it back.
+        val rows = blocks.filter { it.blockId !in waiting }.mapIndexed { i, b ->
             EssayBlockEntity(known[b.blockId] ?: newId(), essayId, i, b.blockId, b.type, b.text, b.color.apiName, photo = b.imageUrl, fixed = b.fixed)
         }
         // The editor writes without this mutex, so typing during the fetch must win over the fetched body.

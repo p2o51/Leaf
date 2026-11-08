@@ -53,6 +53,7 @@ class AppContainer(context: Context) {
         requestSync = { scheduler.request() },
         importPhoto = photos::import,
         loadBody = sync::loadBody,
+        refreshBody = sync::refreshBody,
         freshFileUrl = sync::fileUrl,
         readPhoto = photos::read,
         downloadPhoto = photos::download,

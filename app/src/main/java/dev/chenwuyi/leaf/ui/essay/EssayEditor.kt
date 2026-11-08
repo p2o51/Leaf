@@ -95,6 +95,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -139,7 +140,9 @@ import dev.chenwuyi.leaf.data.Picture
 import dev.chenwuyi.leaf.data.Scribble
 import dev.chenwuyi.leaf.data.WallRules
 import dev.chenwuyi.leaf.data.sync.SyncStatus
+import dev.chenwuyi.leaf.ui.component.InputMode
 import dev.chenwuyi.leaf.ui.component.PictureView
+import dev.chenwuyi.leaf.ui.component.inputMode
 import dev.chenwuyi.leaf.ui.component.scribbleShape
 import dev.chenwuyi.leaf.ui.theme.EditorBodyStyle
 import dev.chenwuyi.leaf.ui.theme.EditorTitleStyle
@@ -182,6 +185,24 @@ fun EssayEditor(
     onOpenFile: (EssayBlock.Attachment) -> Unit = {},
     onSavePhoto: (EssayBlock.Photo) -> Unit = {},
 ) {
+    // 电脑模式 (a hardware keyboard attached) opens the 写作台; 平板模式 keeps the block editor, drag first.
+    // 51 can still take one essay to the block editor from the desk's menu.
+    var tabletHere by rememberSaveable(essay.id) { mutableStateOf(false) }
+    if (inputMode == InputMode.Desktop && !tabletHere) {
+        DeskEditor(
+            essay = essay,
+            scribbles = scribbles,
+            sync = sync,
+            onBack = onBack,
+            onChange = onChange,
+            onRemoveBlock = onRemoveBlock,
+            onOpenFile = onOpenFile,
+            onSavePhoto = onSavePhoto,
+            onTabletMode = { tabletHere = true },
+            modifier = modifier,
+        )
+        return
+    }
     // Typing goes to a local draft first: waiting for Room's round trip would drop fast keystrokes.
     var draft by remember(essay.id) { mutableStateOf(essay) }
     var lastEdit by remember(essay.id) { mutableLongStateOf(0L) }
@@ -638,7 +659,7 @@ private fun Readable(modifier: Modifier = Modifier, content: @Composable android
  * nothing. A run that never starts (offline with nothing to say) clears it too. Null when quiet.
  */
 @Composable
-private fun rememberSyncFlash(sync: EditorSync, lastEdit: Long): String? {
+internal fun rememberSyncFlash(sync: EditorSync, lastEdit: Long): String? {
     var flash by remember { mutableStateOf<String?>(null) }
     var sawRun by remember { mutableStateOf(false) }
     val status by rememberUpdatedState(sync.status)
@@ -1039,7 +1060,7 @@ private fun ScribblePicker(open: Boolean, scribbles: List<Scribble>, onDismiss: 
 /** A synced block renders from the live scribble: recolour or edit it on the wall and it changes here too. */
 /** A Notion file, PDF, video or audio block: its name and kind; a tap opens it in whatever app handles it. */
 @Composable
-private fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
+internal fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
     val icon = when (block.type) {
         "pdf" -> Icons.Rounded.PictureAsPdf
         "video" -> Icons.Rounded.Movie
@@ -1077,7 +1098,7 @@ private fun AttachmentBlock(block: EssayBlock.Attachment, onOpen: () -> Unit) {
 }
 
 @Composable
-private fun SyncedScribbleBlock(scribble: Scribble?) {
+internal fun SyncedScribbleBlock(scribble: Scribble?) {
     val tones = LocalNotionTones.current
     if (scribble == null) {
         Text(
