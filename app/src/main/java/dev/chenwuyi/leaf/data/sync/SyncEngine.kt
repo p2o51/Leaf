@@ -339,7 +339,9 @@ class SyncEngine(
         val blocks = try { auth.withToken(token) { notion.essayBody(it, pageId) } } catch (_: NotionException) { return@withLock }
         // Blocks already known keep their local ID, so an edit made from the old list still lands on them.
         val known = before.filter { it.blockId != null }.associate { it.blockId to it.id }
-        val rows = blocks.mapIndexed { i, b ->
+        // A block deleted here whose DeleteBlock has not gone out yet is still in Notion; its op targets
+        // the Notion block ID, so drop it from the fetched body rather than bring it back.
+        val rows = blocks.filter { it.blockId !in waiting }.mapIndexed { i, b ->
             EssayBlockEntity(known[b.blockId] ?: newId(), essayId, i, b.blockId, b.type, b.text, b.color.apiName, photo = b.imageUrl, fixed = b.fixed)
         }
         // The editor writes without this mutex, so typing during the fetch must win over the fetched body.

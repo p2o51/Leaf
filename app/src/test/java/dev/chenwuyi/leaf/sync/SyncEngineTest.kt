@@ -162,6 +162,16 @@ class SyncEngineTest {
     }
 
     @Test
+    fun should_notBringBackADeletedBlock_when_refreshingBeforeTheDeleteGoesOut() = runBlocking {
+        db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0, bodyLoaded = true)))
+        db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default"), EssayBlockEntity("k2", "e1", 1, "x2", "paragraph", "晚上", "default")))
+        fake.children["p1"] = mutableListOf(fake.paragraph("x1", "早上"), fake.paragraph("x2", "晚上"))
+        repo.removeBlocks("e1", setOf("k2"))
+        engine.refreshBody("e1")
+        assertEquals(listOf("早上"), db.dao().blocksOf("e1").map { it.text })
+    }
+
+    @Test
     fun should_keep_local_block_ids_when_loading_a_body_again() = runBlocking {
         db.dao().upsertEssays(listOf(EssayEntity("e1", "p1", "东京第三天", "default", false, 0)))
         db.dao().upsertBlocks(listOf(EssayBlockEntity("k1", "e1", 0, "x1", "paragraph", "早上", "default")))
