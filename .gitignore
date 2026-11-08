@@ -10,3 +10,12 @@
 *.jks
 *.keystore
 .env*
+<<<<<<< Updated upstream
+=======
+
+# SwiftPM build output (apple/)
+.build/
+.swiftpm/
+apple/Leaf/.build/
+apple/Leaf/build/
+>>>>>>> Stashed changes
