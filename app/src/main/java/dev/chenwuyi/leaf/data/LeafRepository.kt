@@ -26,6 +26,8 @@ interface LeafRepository {
     suspend fun copyToEssay(scribbleIds: Set<String>, essayId: String?): String
     /** Fetches an essay's body from Notion when it is not loaded yet (no-op when offline or unconnected). */
     suspend fun loadEssayBody(essayId: String) {}
+    /** Fetches the open essay's body again so edits made elsewhere arrive; skipped while its own edits wait to go out. */
+    suspend fun refreshEssayBody(essayId: String) {}
     /** A fresh link to an attached file (Notion's signed URLs expire after an hour); null when unreachable. */
     suspend fun fileUrl(blockId: String): String? = null
     /** An essay photo's image bytes, for saving to the gallery; null for sample art or when unreachable. */

@@ -29,6 +29,7 @@ class RoomLeafRepository(
     private val requestSync: () -> Unit,
     private val importPhoto: (String) -> String? = { it },
     private val loadBody: suspend (essayId: String) -> Unit = {},
+    private val refreshBody: suspend (essayId: String) -> Unit = {},
     private val freshFileUrl: suspend (notionBlockId: String) -> String? = { null },
     private val readPhoto: (String) -> ByteArray? = { null },
     private val downloadPhoto: suspend (String) -> ByteArray? = { null },
@@ -183,6 +184,8 @@ class RoomLeafRepository(
     }
 
     override suspend fun loadEssayBody(essayId: String) = loadBody(essayId)
+
+    override suspend fun refreshEssayBody(essayId: String) = refreshBody(essayId)
 
     override suspend fun photoBytes(blockId: String): ByteArray? {
         val row = dao.block(blockId) ?: return null

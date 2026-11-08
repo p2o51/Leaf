@@ -319,12 +319,20 @@ class SyncEngine(
     }
 
     /** Loads one essay's body unless it is loaded already or has edits still waiting to go out. */
-    suspend fun loadBody(essayId: String): Unit = mutex.withLock {
+    suspend fun loadBody(essayId: String): Unit = fetchBody(essayId, again = false)
+
+    /**
+     * Fetches the body of the essay open in the 写作台 again, so edits made elsewhere (Notion, the Mac)
+     * reach the open window. Only that one page is fetched, and only while nothing of it waits to go out.
+     */
+    suspend fun refreshBody(essayId: String): Unit = fetchBody(essayId, again = true)
+
+    private suspend fun fetchBody(essayId: String, again: Boolean): Unit = mutex.withLock {
         val c = store.connection.value ?: return@withLock
         val token = store.token() ?: return@withLock
         val essay = dao.essay(essayId) ?: return@withLock
         val pageId = essay.pageId ?: return@withLock
-        if (essay.bodyLoaded) return@withLock
+        if (essay.bodyLoaded && !again) return@withLock
         val waiting = pending()
         if (essayId in waiting || dao.blocksOf(essayId).any { it.id in waiting }) return@withLock
         val before = dao.blocksOf(essayId)
