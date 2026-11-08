@@ -1,0 +1,28 @@
+{
+  "color": [
+    { "name": "start_window_background", "value": "#12160D" },
+    { "name": "surface", "value": "#12160D" },
+    { "name": "surface_low", "value": "#1A1F14" },
+    { "name": "surface_container", "value": "#1E2418" },
+    { "name": "surface_high", "value": "#282F21" },
+    { "name": "on_surface", "value": "#E2E6D6" },
+    { "name": "on_surface_variant", "value": "#C2C9B4" },
+    { "name": "primary", "value": "#A9D650" },
+    { "name": "on_primary", "value": "#1A3700" },
+    { "name": "primary_container", "value": "#3E6B00" },
+    { "name": "on_primary_container", "value": "#D9FF8F" },
+    { "name": "tertiary", "value": "#BEC2FF" },
+    { "name": "tertiary_container", "value": "#353AA6" },
+    { "name": "pasted", "value": "#BEC2FF" },
+    { "name": "card_default", "value": "#1A1F14" },
+    { "name": "card_gray", "value": "#3A3935" },
+    { "name": "card_brown", "value": "#4A3528" },
+    { "name": "card_orange", "value": "#5A3A1E" },
+    { "name": "card_yellow", "value": "#4F4614" },
+    { "name": "card_green", "value": "#25452A" },
+    { "name": "card_blue", "value": "#1F3A57" },
+    { "name": "card_purple", "value": "#3B2E5C" },
+    { "name": "card_pink", "value": "#55283F" },
+    { "name": "card_red", "value": "#5A2A24" }
+  ]
+}

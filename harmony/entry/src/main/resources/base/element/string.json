@@ -1,0 +1,8 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "Leaf 随笔" },
+    { "name": "ability_desc", "value": "写随笔，存在你的 Notion 里" },
+    { "name": "app_name", "value": "Leaf" },
+    { "name": "permission_internet", "value": "和你的 Notion 同步随笔" }
+  ]
+}

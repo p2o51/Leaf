@@ -1,0 +1,29 @@
+# Leaf for HarmonyOS: the shared logic under harmony/entry/src/main/ets/core is plain-TypeScript ArkTS, so
+# its acceptance cases (the same ones as the Android DeskTextTest) run on Node here. The ArkUI app itself
+# needs DevEco Studio and is built on 51's Mac (harmony/HANDOFF.md).
+name: harmony-core
+
+on:
+  push:
+    branches: [main]
+    paths: ['harmony/**', '.github/workflows/harmony-core.yml']
+  pull_request:
+    paths: ['harmony/**', '.github/workflows/harmony-core.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: harmony/tools/core-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test

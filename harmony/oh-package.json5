@@ -1,0 +1,8 @@
+{
+  "modelVersion": "5.0.0",
+  "description": "Leaf for HarmonyOS: phone, tablet and 2-in-1 (HarmonyOS PC) from one ArkTS codebase.",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hypium": "1.0.19"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "leaf-harmony-core-test",
+  "private": true,
+  "description": "Runs Leaf's shared acceptance cases against harmony/entry/src/main/ets/core on Node. core/ is written in the ArkTS subset that is also TypeScript, so it compiles here without the HarmonyOS SDK.",
+  "scripts": {
+    "test": "node prepare.mjs && tsc -p tsconfig.json && node --test out/test/*.test.js && node arkts-lint.js"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "typescript": "5.6.3",
+    "ohos-typescript": "4.9.5-r10"
+  }
+}

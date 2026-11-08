@@ -1,0 +1,20 @@
+/node_modules
+/oh_modules
+/local.properties
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test
+/.appanalyzer
+oh-package-lock.json5
+# Signing material DevEco generates (auto-signing) stays on 51's machine.
+*.p12
+*.cer
+*.p7b
+*.csr
+/tools/core-test/node_modules
+/tools/core-test/out
