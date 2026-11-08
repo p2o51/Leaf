@@ -146,7 +146,8 @@ enum Sentences {
 
 enum Fonts {
     static func body(size: CGFloat) -> NSFont {
-        for name in ["iAWriterDuoS-Regular", "iAWriterDuoV", "iAWriterMonoS-Regular"] {
+        // IBM Plex Mono, not iA's fonts: the iA-Fonts README asks editors not to ship or default to them.
+        for name in ["IBMPlexMono", "IBMPlexMono-Regular"] {
             if let font = NSFont(name: name, size: size) { return font }
         }
         return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)

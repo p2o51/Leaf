@@ -12,7 +12,7 @@ swift build -c release
 .build/release/EditorSpike --bench      # types 2 000 characters into the middle, prints per-keystroke timings, quits
 ```
 
-Fonts: if iA Writer Duo / Mono are installed (github.com/iaolo/iA-Fonts, SIL OFL) they are used, otherwise
-the system monospaced font. CJK falls back to the system (PingFang SC).
+Fonts: IBM Plex Mono if installed, otherwise the system monospaced font. Not iA Writer's fonts: their
+README asks text editors not to bundle them or use them as the default. CJK falls back to the system (PingFang SC).
 
 Needs Xcode command line tools and macOS 14+.
