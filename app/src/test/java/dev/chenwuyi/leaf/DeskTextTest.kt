@@ -110,6 +110,14 @@ class DeskTextTest {
     }
 
     @Test
+    fun should_showParagraphAsIs_when_itsWordsLookLikeMarkdown() {
+        val parts = DeskText.parts(listOf(p("a", "# 不是标题"), p("b", "正文"), p("c", "引用\n> 还是引用", "quote")))
+        assertTrue(parts[0] is DeskPart.Shown)
+        assertEquals(listOf("b"), (parts[1] as DeskPart.Text).blocks.map { it.id })
+        assertTrue(parts[2] is DeskPart.Shown)
+    }
+
+    @Test
     fun should_findChineseSentence_when_caretIsInside() {
         val t = "早上很安静。窗外下雨了！"
         assertEquals("窗外下雨了！", t.substring(DeskFocus.sentence(t, 8)))

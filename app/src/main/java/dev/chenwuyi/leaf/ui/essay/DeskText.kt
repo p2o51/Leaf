@@ -37,7 +37,19 @@ object DeskText {
 
     private val ListTypes = setOf("bulleted_list_item", "numbered_list_item")
 
-    fun editable(block: EssayBlock): Boolean = block is EssayBlock.Paragraph && !block.fixed && block.type in Editable
+    fun editable(block: EssayBlock): Boolean =
+        block is EssayBlock.Paragraph && !block.fixed && block.type in Editable && roundTrips(block)
+
+    /**
+     * Whether the block reads back as itself from its Markdown. A paragraph whose words start with `# ` or
+     * `- `, or a quote with a line starting `>`, would turn into another block (or lose a character) the
+     * first time any block in its run is edited, so the 写作台 shows it, unedited, instead.
+     */
+    private fun roundTrips(block: EssayBlock.Paragraph): Boolean {
+        if (block.text.isEmpty()) return true
+        val lines = parse(prefix(block.type, 1) + block.text)
+        return lines.size == 1 && lines[0].type == block.type && lines[0].text == block.text
+    }
 
     /** The page as runs and shown blocks. A run always follows the last shown block, so there is somewhere to keep writing. */
     fun parts(blocks: List<EssayBlock>): List<DeskPart> {
