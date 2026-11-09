@@ -48,7 +48,7 @@ final class AppModel: ObservableObject {
     /// While an essay is open and the window in front, that one page is fetched again this often.
     static let openRefreshEvery: TimeInterval = 30
     /// Pushing waits for the pen to rest this long after a write.
-    static let pushAfter: TimeInterval = 1.5
+    nonisolated static let pushAfter: TimeInterval = 1.5
     static let restBeforeRefresh: TimeInterval = 1.5
 
     let store: Store
