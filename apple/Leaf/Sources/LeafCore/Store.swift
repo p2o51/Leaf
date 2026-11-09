@@ -122,7 +122,9 @@ public actor Store {
             let old = Dictionary(self.blocks(essayId).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let rows = blocks.map { b -> Block in
                 var row = b
-                row.notionId = old[b.id]?.notionId ?? b.notionId
+                // The stored block is the authority on where it lives in Notion, even when that is nowhere
+                // yet: a restyle cleared its id, and the editor's older copy must not bring it back.
+                if let before = old[b.id] { row.notionId = before.notionId }
                 // Notion can't change a block's type in place: a restyled block goes out as a new block in
                 // the same spot, and the old one is deleted.
                 if let before = old[b.id], before.notionId != nil, before.type != row.type { row.notionId = nil }
@@ -305,9 +307,12 @@ public actor Store {
     /// any connection stay and are queued, so nothing written offline is lost.
     public func connect(_ connection: Connection) {
         let mine = index.essays.filter { $0.pageId == nil }
+        let notes = index.scribbles.filter { $0.notionId == nil }
         for meta in index.essays where meta.pageId != nil { dropBody(meta.id) }
         index = Index(connection: connection)
         index.essays = mine
+        index.scribbles = notes
+        for note in notes { queue(.saveScribble, note.id) }
         for meta in mine {
             queue(.saveEssay, meta.id)
             for block in blocks(meta.id) {

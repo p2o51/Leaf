@@ -131,11 +131,23 @@ final class DeskController: NSObject, NSTextViewDelegate, NSTextStorageDelegate 
 
     // ---- loading an essay ----
 
+    /// The essay being opened. The text view keeps showing (and [essayId] keeps naming) the previous essay
+    /// until the new one is laid out, and can't be typed into meanwhile, so nothing typed during the fetch
+    /// is saved under the wrong essay.
+    private var opening: String?
+
     func open(_ essayId: String) async {
         writeNow()
-        self.essayId = essayId
+        opening = essayId
+        textView.isEditable = false
         await model.open(essayId)
+        // Another essay was picked while this one was fetched: that open wins.
+        guard opening == essayId else { return }
+        self.essayId = essayId
         await load(caret: nil)
+        guard opening == essayId else { return }
+        opening = nil
+        textView.isEditable = true
         model.openDesk = self
         textView.window?.makeFirstResponder(textView)
     }

@@ -96,3 +96,32 @@ final class SyncTests: XCTestCase {
         XCTAssertEqual(["一篇"], titles)
     }
 }
+
+extension SyncTests {
+    func test_should_createTheHeading_when_aRestyledBlockIsEditedAgainFromAnOlderCopy() async {
+        let pageId = fake.addPage("文", blocks: [("paragraph", "标题")])
+        _ = await sync.run()
+        let meta = await store.essays.first { $0.pageId == pageId }!
+        await sync.loadBody(meta.id)
+        let stale = await store.blocks(meta.id)
+        var heading = stale[0]
+        heading.type = "heading_2"
+        await store.updateEssay(meta.id, title: "文", blocks: [heading])
+        // The desk's copy still carries the old Notion id; a second edit must not bring it back.
+        heading.text = "新标题"
+        await store.updateEssay(meta.id, title: "文", blocks: [heading])
+        _ = await sync.run(pull: false)
+        XCTAssertEqual(["heading_2"], fake.page(pageId)?.blocks.map(\.type))
+        XCTAssertEqual(["新标题"], fake.page(pageId)?.blocks.map(\.text))
+    }
+
+    func test_should_keepAndSendWallNotes_when_writtenBeforeConnecting() async {
+        let offline = Store(dir: dir.appendingPathComponent("offline"))
+        _ = await offline.addScribble("离线写的", color: .yellow)
+        await offline.connect(Connection(workspace: "ws", dataSourceId: "ds", databaseName: "随笔", titleProperty: "Name", wallPageId: "page-1"))
+        let notes = await offline.scribbles.map(\.text)
+        let queued = await offline.outbox.map(\.kind)
+        XCTAssertEqual(["离线写的"], notes)
+        XCTAssertEqual([.saveScribble], queued)
+    }
+}
