@@ -516,15 +516,34 @@ final class DeskController: NSObject, NSTextViewDelegate, NSTextStorageDelegate 
         if settings.style {
             for hit in hits where hit.end <= length { add(layout, content, .backgroundColor, styleMark, hit.start..<hit.end) }
         }
-        // TextKit 2 keeps line fragments as drawn: new rendering attributes only show once the fragments are
-        // laid out again. Invalidation is lazy (only the viewport is redone), and it is skipped when nothing
-        // that colours the page moved, so walking the caret inside one sentence costs nothing.
+        // TextKit 2 keeps line fragments as drawn, and neither invalidateLayout nor needsDisplay makes NSTextView
+        // pick up new rendering attributes (checked on macOS with the --shots run). What does is the storage
+        // announcing an attribute edit, as a font change does. It changes nothing in the text, is ignored by
+        // the storage delegate (no characters edited), happens on the next turn of the run loop so it never
+        // lands inside an edit, and is skipped when nothing that colours the page moved.
         let look = Look(text: length, focus: focus, pasted: pastedRuns, hits: settings.style ? hits.map { $0.start..<$0.end } : [], dark: textView.effectiveAppearance.name)
         if look != lastLook {
             lastLook = look
-            layout.invalidateLayout(for: whole)
-            textView.needsDisplay = true
+            if !repaintQueued {
+                repaintQueued = true
+                Task { @MainActor [weak self] in self?.repaint() }
+            }
         }
+    }
+
+    private var repaintQueued = false
+
+    private func repaint() {
+        repaintQueued = false
+        guard let storage = textView.textStorage, storage.length > 0 else { return }
+        let selection = textView.selectedRanges
+        let was = loading
+        loading = true
+        storage.beginEditing()
+        storage.edited(.editedAttributes, range: NSRange(location: 0, length: storage.length), changeInLength: 0)
+        storage.endEditing()
+        loading = was
+        textView.selectedRanges = selection
     }
 
     private struct Look: Equatable {
