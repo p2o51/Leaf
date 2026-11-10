@@ -7,6 +7,10 @@ is an essay with a cover or a Keep-style card colour.
 - Plan: https://claude.ai/artifact/1yprJbPjFiszgDCEPap3Tc
 - Interactive prototype: https://claude.ai/artifact/8YRQivJRgP2GjKTGFhuMMQ
 
+## Other platforms
+
+- HarmonyOS (phone, tablet, HarmonyOS PC): [`harmony/`](harmony/README.md), build notes in [`harmony/HANDOFF.md`](harmony/HANDOFF.md).
+
 ## Milestones
 
 1. **M0 skeleton** (this): theme, sample data, home strip + essay grid, the + menu, the full wall with

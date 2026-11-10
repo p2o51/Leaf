@@ -1,0 +1,28 @@
+{
+  "color": [
+    { "name": "start_window_background", "value": "#12160D" },
+    { "name": "leaf_paper", "value": "#12160D" },
+    { "name": "leaf_paper_clear", "value": "#0012160D" },
+    { "name": "leaf_side", "value": "#1A1F14" },
+    { "name": "leaf_card", "value": "#282F21" },
+    { "name": "leaf_raised", "value": "#232A1C" },
+    { "name": "leaf_text", "value": "#E2E6D6" },
+    { "name": "leaf_text_2", "value": "#C2C9B4" },
+    { "name": "leaf_chip", "value": "#1FE2E6D6" },
+    { "name": "leaf_lime", "value": "#3E6B00" },
+    { "name": "leaf_on_lime", "value": "#D9FF8F" },
+    { "name": "leaf_green", "value": "#A9D650" },
+    { "name": "leaf_on_green", "value": "#1A3700" },
+    { "name": "leaf_ink", "value": "#BEC2FF" },
+    { "name": "pasted", "value": "#BEC2FF" },
+    { "name": "card_gray", "value": "#3A3935" },
+    { "name": "card_brown", "value": "#4A3528" },
+    { "name": "card_orange", "value": "#5A3A1E" },
+    { "name": "card_yellow", "value": "#4F4614" },
+    { "name": "card_green", "value": "#25452A" },
+    { "name": "card_blue", "value": "#1F3A57" },
+    { "name": "card_purple", "value": "#3B2E5C" },
+    { "name": "card_pink", "value": "#55283F" },
+    { "name": "card_red", "value": "#5A2A24" }
+  ]
+}
