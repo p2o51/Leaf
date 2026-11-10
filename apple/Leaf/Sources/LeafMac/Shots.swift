@@ -153,7 +153,8 @@ enum Shots {
         model.newEssay()
         await wait(1.6)
         if let fresh = model.openDesk {
-            fresh.placeCaret(after: "")
+            // A new essay opens with the caret on the (empty) title line, as for the writer.
+            fresh.textView.window?.makeFirstResponder(fresh.textView)
             fresh.insert("新的一篇\n\n从这里开始写。", pasted: false)
         }
         await wait(1.4)
@@ -180,6 +181,8 @@ enum Shots {
     /// The real on-screen pixels when the process may record the screen, otherwise AppKit's own drawing
     /// of the window (close, but materials and vibrancy can look flatter).
     private static func shot(_ window: NSWindow, _ dir: URL, _ name: String) async {
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
         window.displayIfNeeded()
         await wait(0.3)
         let url = dir.appendingPathComponent(name + ".png")

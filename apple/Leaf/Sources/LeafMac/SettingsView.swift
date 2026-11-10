@@ -8,7 +8,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             ConnectionPane().tabItem { Label("Notion", systemImage: "link") }
-            AppearancePane().tabItem { Label("写作台", systemImage: "textformat") }
+            AppearancePane().tabItem { Label("写作台", systemImage: "square.and.pencil") }
         }
         .frame(width: 520, height: 400)
     }

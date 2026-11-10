@@ -516,7 +516,26 @@ final class DeskController: NSObject, NSTextViewDelegate, NSTextStorageDelegate 
         if settings.style {
             for hit in hits where hit.end <= length { add(layout, content, .backgroundColor, styleMark, hit.start..<hit.end) }
         }
+        // TextKit 2 keeps line fragments as drawn: new rendering attributes only show once the fragments are
+        // laid out again. Invalidation is lazy (only the viewport is redone), and it is skipped when nothing
+        // that colours the page moved, so walking the caret inside one sentence costs nothing.
+        let look = Look(text: length, focus: focus, pasted: pastedRuns, hits: settings.style ? hits.map { $0.start..<$0.end } : [], dark: textView.effectiveAppearance.name)
+        if look != lastLook {
+            lastLook = look
+            layout.invalidateLayout(for: whole)
+            textView.needsDisplay = true
+        }
     }
+
+    private struct Look: Equatable {
+        var text: Int
+        var focus: Range<Int>?
+        var pasted: [Range<Int>]
+        var hits: [Range<Int>]
+        var dark: NSAppearance.Name
+    }
+
+    private var lastLook: Look?
 
     private func add(_ layout: NSTextLayoutManager, _ content: NSTextContentManager, _ key: NSAttributedString.Key, _ value: Any, _ r: Range<Int>) {
         guard let start = content.location(content.documentRange.location, offsetBy: r.lowerBound),
