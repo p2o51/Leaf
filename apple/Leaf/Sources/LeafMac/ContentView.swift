@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var model: AppModel
     @State private var columns = NavigationSplitViewVisibility.all
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
@@ -28,6 +29,9 @@ struct ContentView: View {
             }
         }
         .searchable(text: $model.search, placement: .sidebar, prompt: "搜索随笔")
+        .task {
+            if let dir = Shots.dir { await Shots.run(model: model, into: dir, openSettings: { openSettings() }) }
+        }
     }
 }
 

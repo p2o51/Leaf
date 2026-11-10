@@ -191,6 +191,14 @@ public actor Store {
         changed()
     }
 
+    /// Puts an essay into the library as it is, without queueing anything: for sample data (the screenshot
+    /// run) only. Real essays come from [newEssay] or from Notion.
+    public func seed(_ meta: EssayMeta, blocks: [Block]) {
+        replaceMeta(meta)
+        setBlocks(meta.id, blocks)
+        changed()
+    }
+
     public func addScribble(_ text: String, color: NotionColor) -> Scribble {
         let s = Scribble(id: newId(), text: text, color: color, createdAt: clock())
         index.scribbles.insert(s, at: 0)

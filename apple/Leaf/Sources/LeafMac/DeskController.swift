@@ -243,6 +243,33 @@ final class DeskController: NSObject, NSTextViewDelegate, NSTextStorageDelegate 
         return out
     }
 
+    // ---- driving the desk (the screenshot run) ----
+
+    /// Puts the caret just after the first [needle], or at the end.
+    func placeCaret(after needle: String) {
+        let ns = textView.string as NSString
+        let r = ns.range(of: needle)
+        let at = r.location == NSNotFound ? ns.length : NSMaxRange(r)
+        textView.window?.makeFirstResponder(textView)
+        textView.setSelectedRange(NSRange(location: at, length: 0))
+    }
+
+    /// Types or pastes [text] at the caret through the same path a keyboard or ⌘V takes.
+    func insert(_ text: String, pasted: Bool) {
+        textView.pasting = pasted
+        textView.insertText(text, replacementRange: textView.selectedRange())
+        textView.pasting = false
+    }
+
+    var focusRange: Range<Int>? {
+        guard settings.focus != .off else { return nil }
+        let caret = textView.selectedRange().location
+        return settings.focus == .sentence ? DeskFocus.sentence(textView.string, caret) : DeskFocus.paragraph(textView.string, caret)
+    }
+
+    var styleHitCount: Int { hits.count }
+    var pastedCount: Int { origins.filter { $0 == .pasted }.count }
+
     // ---- writing ----
 
     /// The text split back into the title and each slot's Markdown (UTF-16 offsets of each slot's start).

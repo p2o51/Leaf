@@ -20,7 +20,7 @@ final class DeskSettings: ObservableObject {
         var next: Focus { self == .off ? .sentence : self == .sentence ? .paragraph : .off }
     }
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
     @Published var focus: Focus { didSet { defaults.set(focus.rawValue, forKey: "desk.focus") } }
     @Published var typewriter: Bool { didSet { defaults.set(typewriter, forKey: "desk.typewriter") } }
@@ -29,7 +29,8 @@ final class DeskSettings: ObservableObject {
     @Published var origins: Bool { didSet { defaults.set(origins, forKey: "desk.origins") } }
     @Published var textSize: Double { didSet { defaults.set(textSize, forKey: "desk.size") } }
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         focus = Focus(rawValue: defaults.string(forKey: "desk.focus") ?? "") ?? .off
         typewriter = defaults.bool(forKey: "desk.typewriter")
         font = DeskFont(rawValue: defaults.string(forKey: "desk.font") ?? "") ?? .serif
@@ -54,7 +55,7 @@ final class AppModel: ObservableObject {
     let store: Store
     let sync: SyncEngine
     let notion = LeafNotion()
-    let desk = DeskSettings()
+    let desk: DeskSettings
 
     @Published private(set) var essays: [EssayMeta] = []
     @Published private(set) var scribbles: [Scribble] = []
@@ -76,7 +77,17 @@ final class AppModel: ObservableObject {
     init() {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Leaf", isDirectory: true)
-        store = Store(dir: support)
+        if Shots.dir != nil {
+            // The screenshot run uses a throwaway library and settings, never the real ones.
+            let temp = FileManager.default.temporaryDirectory.appendingPathComponent("leaf-shots-\(UUID().uuidString)")
+            store = Store(dir: temp)
+            let suite = UserDefaults(suiteName: "dev.chenwuyi.leaf.shots") ?? .standard
+            suite.removePersistentDomain(forName: "dev.chenwuyi.leaf.shots")
+            desk = DeskSettings(defaults: suite)
+        } else {
+            store = Store(dir: support)
+            desk = DeskSettings()
+        }
         sync = SyncEngine(store: store, notion: notion, credentials: KeychainCredentials())
         Task {
             await store.observe { [weak self] in Task { @MainActor in await self?.reload() } }
