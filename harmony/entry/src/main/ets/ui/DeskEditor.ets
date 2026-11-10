@@ -6,9 +6,11 @@ import { LeafApp } from '../data/LeafApp';
 import { newId } from '../data/Library';
 import {
   DeskFont, familyOf, fontLabel, inkColor, lineHeightOf, PLEX_SANS, PLEX_SANS_SEMIBOLD, quietColor, REFRESH_EVERY_MS,
-  REFRESH_REST_MS, sizeOf, WRITE_AFTER_MS,
+  headingFamily, REFRESH_REST_MS, sizeOf, topBlur, TopFade, WRITE_AFTER_MS,
 } from './Look';
 import { CAPTION_RIGHT_KEY, CAPTION_TOP_KEY, WindowChrome } from './WindowChrome';
+import { VoiceError, VoiceInput, VoiceState } from '../data/Voice';
+import { common } from '@kit.AbilityKit';
 
 /** 专注: off, the sentence being written, or its paragraph; everything else fades. */
 export enum FocusMode {
@@ -20,9 +22,9 @@ export enum FocusMode {
 function focusLabel(m: FocusMode): string {
   switch (m) {
     case FocusMode.Sentence:
-      return '句';
+      return '句子';
     case FocusMode.Paragraph:
-      return '段';
+      return '段落';
     default:
       return '全文';
   }
@@ -56,12 +58,17 @@ struct DeskRun {
   onTyping: () => void = () => {};
   /** The caret's line top inside this run (vp), for 打字机. */
   onCaretLine: (runKey: string, top: number) => void = () => {};
+  /** The cursor went into this run: dictated words go here. */
+  onActive: (runKey: string) => void = () => {};
+  /** `seq\u0000words` from 语音输入, for this run only: inserted at the caret (or at the end). */
+  @Prop @Watch('dictate') dictation: string = '';
   private controller: RichEditorController = new RichEditorController();
   private text: string = '';
   private origins: Origin[] = [];
   private caret: number = -1;
   private hits: StyleHit[] = [];
   private pasting: boolean = false;
+  private speaking: boolean = false;
   private writeTimer: number = -1;
   private styleTimer: number = -1;
 
@@ -117,8 +124,10 @@ struct DeskRun {
       return;
     }
     // A paste (shortcut or menu) reads as pasted; typing and the IME committing a word read as typed.
-    this.origins = DeskOrigins.splice(this.origins, this.text, next, this.pasting ? Origin.Pasted : Origin.Typed);
+    const origin = this.pasting ? Origin.Pasted : (this.speaking ? Origin.Spoken : Origin.Typed);
+    this.origins = DeskOrigins.splice(this.origins, this.text, next, origin);
     this.pasting = false;
+    this.speaking = false;
     this.text = next;
     this.onTyping();
     if (this.writeTimer >= 0) {
@@ -166,6 +175,19 @@ struct DeskRun {
     this.hits = DeskStyle.check(this.text, rules);
   }
 
+  dictate(): void {
+    const cut = this.dictation.indexOf('\u0000');
+    const words = cut >= 0 ? this.dictation.substring(cut + 1) : '';
+    if (words.length === 0) {
+      return;
+    }
+    const at = this.caret >= 0 ? this.caret : this.text.length;
+    this.speaking = true;
+    this.controller.addTextSpan(words, { offset: at, style: this.baseStyle() });
+    this.controller.setCaretOffset(at + words.length);
+    this.changed();
+  }
+
   restyleAll(): void {
     this.checkStyle();
     this.restyle();
@@ -201,7 +223,7 @@ struct DeskRun {
     const style: RichEditorTextStyle = {
       fontColor: inkColor(s.ink, s.faded, this.dark),
       fontWeight: s.bold ? FontWeight.Medium : FontWeight.Normal,
-      fontFamily: s.bold && this.font !== DeskFont.Mono ? `${PLEX_SANS_SEMIBOLD}, ${familyOf(this.font)}` : familyOf(this.font),
+      fontFamily: s.bold ? headingFamily(this.font) : familyOf(this.font),
       decoration: {
         // A long sentence is underlined faintly (Android shades it; RichEditor spans have no background on API 12).
         type: struck ? TextDecorationType.LineThrough : (s.shaded ? TextDecorationType.Underline : TextDecorationType.None),
@@ -241,6 +263,9 @@ struct DeskRun {
         this.reportCaret();
       })
       .onEditingChange((editing: boolean) => {
+        if (editing) {
+          this.onActive(this.runKey);
+        }
         if (!editing) {
           // Nothing fades while the cursor is elsewhere.
           this.caret = -1;
@@ -287,9 +312,9 @@ struct ShownBlock {
         Divider().color(quietColor(this.dark, 0.3)).margin({ top: 12, bottom: 12 })
       } else if (this.block.kind === BlockKind.Paragraph) {
         Text(this.block.text).fontSize(17).lineHeight(30).fontColor(quietColor(this.dark, 1))
-        Text('带格式的段落，在平板模式或 Notion 里改').fontSize(12).fontColor(quietColor(this.dark, 0.7))
+        Text('此段落带格式。请在平板模式或 Notion 中编辑。').fontSize(12).fontColor(quietColor(this.dark, 0.7))
       } else {
-        Text(`Notion「${this.block.type}」块，在 Notion 里改`).fontSize(13).fontColor(quietColor(this.dark, 0.8))
+        Text(`不支持“${this.block.type}”块。请在 Notion 中编辑。`).fontSize(13).fontColor(quietColor(this.dark, 0.8))
       }
     }
     .alignItems(HorizontalAlign.Start)
@@ -311,11 +336,13 @@ interface ToggleParams extends ChipParams {
   tip: string;
 }
 
-// What the bar's controls take (vp), left of the window buttons: everything; with the three switches folded
-// into 更多; and with the face folded in too. Measured on the MateBook with the widest face name (无衬线).
-const BAR_FULL: number = 400;
-const BAR_NO_SWITCHES: number = 280;
+// What the bar's controls take (vp), left of the window buttons, besides the face pop-up: everything; and with
+// the three switches folded into 更多. Measured on the MateBook.
+const BAR_FULL: number = 344;
+const BAR_NO_SWITCHES: number = 248;
 const BACK_ROOM: number = 48;
+/** How far below the page's top the words start to blur and fade under the bar (the bar is 56vp). */
+const TOP_EDGE: number = 72;
 
 /** A run plus the generation it is shown under; a new generation rebuilds the run's editor. */
 class ShownPart {
@@ -360,6 +387,13 @@ export struct DeskEditor {
   @State rulesKey: string = STYLE_RULES.join(',');
   @State barShown: boolean = true;
   @State barWidth: number = 0;
+  @State pageHeight: number = 0;
+  @State voiceState: VoiceState = VoiceState.Idle;
+  @State dictation: string = '';
+  private voice: VoiceInput = new VoiceInput();
+  private dictated: number = 0;
+  private activeRun: string = '';
+  private unsubscribeVoice: () => void = () => {};
   @State status: string = '';
   @State menuOpen: boolean = false;
   @StorageProp(CAPTION_TOP_KEY) captionTop: number = 0;
@@ -389,11 +423,23 @@ export struct DeskEditor {
       this.status = LeafApp.sync.message;
     });
     this.refreshTimer = setInterval(() => this.refresh(), REFRESH_EVERY_MS);
+    this.voice.onText = (words: string) => {
+      this.dictated++;
+      this.dictation = `${this.dictated}\u0000${words}`;
+    };
+    this.voice.onError = (e: VoiceError) => {
+      this.getUIContext().getPromptAction().showToast({ message: e.message, duration: 3000 });
+    };
+    this.unsubscribeVoice = this.voice.subscribe((s: VoiceState) => {
+      this.voiceState = s;
+    });
   }
 
   aboutToDisappear(): void {
     clearInterval(this.refreshTimer);
     this.unsubscribe();
+    this.unsubscribeVoice();
+    this.voice.cancel();
     if (this.titleTimer >= 0) {
       clearTimeout(this.titleTimer);
       this.saveTitle();
@@ -520,6 +566,28 @@ export struct DeskEditor {
     return value;
   }
 
+  /** Chinese characters plus Latin words in the body, as a writer counts 字. */
+  private wordCount(): number {
+    let n = 0;
+    for (const b of this.body) {
+      const cjk = b.text.match(/[\u3400-\u9fff\uf900-\ufaff]/g);
+      const latin = b.text.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g);
+      n += (cjk === null ? 0 : cjk.length) + (latin === null ? 0 : latin.length);
+    }
+    return n;
+  }
+
+  private countLabel(): string {
+    const digits = String(this.wordCount()).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${digits} 字`;
+  }
+
+  /** About 400 Chinese characters a minute. */
+  private readingLabel(): string {
+    const n = this.wordCount();
+    return n === 0 ? '' : `约 ${Math.max(1, Math.round(n / 400))} 分钟读完`;
+  }
+
   private setTypewriter(on: boolean): void {
     this.typewriter = this.toggle('desk.typewriter', on);
   }
@@ -537,6 +605,24 @@ export struct DeskEditor {
     return Math.max(16, this.captionRight);
   }
 
+  /** Where dictated words go: the run the cursor was last in, else the last run (where new writing goes). */
+  private dictationRun(): string {
+    let last = '';
+    for (const sp of this.shown) {
+      if (sp.part.kind === DeskPartKind.Text) {
+        if (sp.part.key === this.activeRun) {
+          return this.activeRun;
+        }
+        last = sp.part.key;
+      }
+    }
+    return last;
+  }
+
+  private toggleVoice(): void {
+    this.voice.toggle(this.getUIContext().getHostContext() as common.UIAbilityContext);
+  }
+
   /**
    * How much of the bar goes into 更多 when the desk is narrow (beside the list, the window buttons on its
    * right), as the Mac folds its toolbar: 0 nothing, 1 the three switches, 2 the face as well.
@@ -546,7 +632,9 @@ export struct DeskEditor {
       return 0;
     }
     const room = this.barWidth - 16 - this.endInset() - (this.embedded ? 0 : BACK_ROOM);
-    return room >= BAR_FULL ? 0 : (room >= BAR_NO_SWITCHES ? 1 : 2);
+    // The face pop-up is as wide as its name: 无衬线 takes a character more than 衬线 and 等宽.
+    const face = this.font === DeskFont.Sans ? 79 : 65;
+    return room >= BAR_FULL + face ? 0 : (room >= BAR_NO_SWITCHES + face ? 1 : 2);
   }
 
   private toggleRule(r: StyleRule): void {
@@ -576,7 +664,7 @@ export struct DeskEditor {
         .fontColor(p.on ? $r('sys.color.font_primary') : $r('sys.color.font_secondary'))
     }
     .height(28)
-    .padding({ left: 12, right: 12 })
+    .padding({ left: 10, right: 10 })
     .backgroundColor(p.on ? $r('sys.color.comp_background_primary') : Color.Transparent)
     .shadow(p.on ? ShadowStyle.OUTER_DEFAULT_XS : { radius: 0 })
     .onClick(() => p.action())
@@ -626,6 +714,9 @@ export struct DeskEditor {
   @Builder
   MoreMenu() {
     Menu() {
+      // The count lives here rather than on the page, as the plan for Leaf's editor has it.
+      MenuItem({ content: this.countLabel(), labelInfo: this.readingLabel() })
+        .enabled(false)
       // What the bar had no room for comes first.
       if (this.fold() >= 1) {
         MenuItemGroup() {
@@ -633,11 +724,11 @@ export struct DeskEditor {
             .selected(this.typewriter)
             .selectIcon(true)
             .onClick(() => this.setTypewriter(!this.typewriter))
-          MenuItem({ content: '文风' })
+          MenuItem({ content: '风格检查' })
             .selected(this.styleOn)
             .selectIcon(true)
             .onClick(() => this.setStyleOn(!this.styleOn))
-          MenuItem({ content: '来源' })
+          MenuItem({ content: '作者' })
             .selected(this.originsOn)
             .selectIcon(true)
             .onClick(() => this.setOriginsOn(!this.originsOn))
@@ -653,7 +744,7 @@ export struct DeskEditor {
           }, (f: DeskFont) => f)
         }
       }
-      MenuItemGroup({ header: '文风标出' }) {
+      MenuItemGroup({ header: '风格检查' }) {
         ForEach(STYLE_RULES, (r: StyleRule) => {
           MenuItem({ content: styleRuleLabel(r) })
             .selected(this.rulesKey.indexOf(r) >= 0)
@@ -661,9 +752,31 @@ export struct DeskEditor {
             .onChange(() => this.toggleRule(r))
         }, (r: StyleRule) => r)
       }
-      MenuItem({ content: '切到平板模式' })
+      MenuItem({ content: '在平板模式中编辑' })
         .onClick(() => this.onTabletMode())
     }
+  }
+
+  // 语音输入: tap to start, tap again to stop; the words land at the cursor once Scribe answers.
+  @Builder
+  Mic() {
+    Button({ type: ButtonType.Circle, stateEffect: true }) {
+      if (this.voiceState === VoiceState.Transcribing) {
+        LoadingProgress().width(20).height(20).color($r('app.color.leaf_ink'))
+      } else {
+        if (this.voiceState === VoiceState.Recording) {
+          SymbolGlyph($r('sys.symbol.mic_fill')).fontSize(18).fontColor([$r('sys.color.warning')])
+        } else {
+          SymbolGlyph($r('sys.symbol.mic')).fontSize(18).fontColor([$r('sys.color.icon_primary')])
+        }
+      }
+    }
+    .width(32)
+    .height(32)
+    .backgroundColor(Color.Transparent)
+    .accessibilityText(this.voiceState === VoiceState.Recording ? '停止语音输入' : '语音输入')
+    .bindTips('语音输入')
+    .onClick(() => this.toggleVoice())
   }
 
   @Builder
@@ -690,12 +803,6 @@ export struct DeskEditor {
       .borderRadius(999)
       .backgroundColor($r('sys.color.comp_background_tertiary'))
 
-      if (this.fold() === 0) {
-        this.Toggle({
-          label: '打字机', symbol: $r('sys.symbol.text_aligncenter'), tip: '打字机：正在写的一行停在中间',
-          on: this.typewriter, action: () => this.setTypewriter(!this.typewriter)
-        })
-      }
       // One pop-up for the face, as the Mac toolbar has it: the face's name and a chevron.
       if (this.fold() < 2) {
         Button({ type: ButtonType.Capsule, stateEffect: true }) {
@@ -710,15 +817,23 @@ export struct DeskEditor {
         .accessibilityText(`字体：${fontLabel(this.font)}`)
         .bindMenu(this.FontMenu())
       }
-      if (this.fold() === 0) {
-        this.Toggle({
-          label: '文风', symbol: $r('sys.symbol.doc_text_badge_checkmark'), tip: '文风：标出值得再看一眼的词，只标不改',
-          on: this.styleOn, action: () => this.setStyleOn(!this.styleOn)
-        })
-        this.Toggle({
-          label: '来源', symbol: $r('sys.symbol.text_clipboard'), tip: '来源：粘贴进来的字换个颜色',
-          on: this.originsOn, action: () => this.setOriginsOn(!this.originsOn)
-        })
+      // The switches sit together as one cluster, then the microphone, which never folds away.
+      Row() {
+        if (this.fold() === 0) {
+          this.Toggle({
+            label: '打字机', symbol: $r('sys.symbol.text_aligncenter'), tip: '打字机',
+            on: this.typewriter, action: () => this.setTypewriter(!this.typewriter)
+          })
+          this.Toggle({
+            label: '风格检查', symbol: $r('sys.symbol.doc_text_badge_checkmark'), tip: '风格检查',
+            on: this.styleOn, action: () => this.setStyleOn(!this.styleOn)
+          })
+          this.Toggle({
+            label: '作者', symbol: $r('sys.symbol.text_clipboard'), tip: '作者',
+            on: this.originsOn, action: () => this.setOriginsOn(!this.originsOn)
+          })
+        }
+        this.Mic()
       }
       // Stretched to the bar's own height: '100%' would take the page's and make the bar fill it.
       Blank()
@@ -751,7 +866,6 @@ export struct DeskEditor {
     // On a 2-in-1 the bar is the window's caption row: the window buttons sit at its right end.
     .constraintSize({ minHeight: this.captionTop })
     .padding({ left: 16, right: this.endInset(), top: 8, bottom: 8 })
-    .backgroundColor($r('app.color.leaf_paper'))
     .opacity(this.barShown ? 1 : 0)
   }
 
@@ -759,11 +873,12 @@ export struct DeskEditor {
   Legend() {
     Row({ space: 14 }) {
       if (this.originsOn) {
-        Text('● 手打').fontSize(12).fontColor($r('sys.color.font_primary'))
+        Text('● 你').fontSize(12).fontColor($r('sys.color.font_primary'))
         Text('● 粘贴').fontSize(12).fontColor($r('app.color.pasted'))
+        Text('● 语音').fontSize(12).fontColor($r('app.color.leaf_green'))
       }
       if (this.styleOn) {
-        Text('划掉的词：仅作提醒，不自动改').fontSize(12).fontColor($r('sys.color.font_secondary'))
+        Text('仅作标记，不修改文本').fontSize(12).fontColor($r('sys.color.font_secondary'))
       }
     }
     .padding({ left: 14, right: 14, top: 6, bottom: 6 })
@@ -777,7 +892,7 @@ export struct DeskEditor {
         Column() {
           TextInput({ text: this.title, placeholder: '标题' })
             .fontSize(sizeOf(this.font) * 1.35)
-            .fontFamily(familyOf(this.font))
+            .fontFamily(headingFamily(this.font))
             .fontWeight(FontWeight.Medium)
             .backgroundColor(Color.Transparent)
             .padding(0)
@@ -810,6 +925,10 @@ export struct DeskEditor {
                 onWrite: (k: string, b: EssayBlock[], s: Map<string, OriginSpan[]>) => this.onRunWrite(k, b, s),
                 onTyping: () => this.typing(),
                 onCaretLine: (k: string, top: number) => this.caretLine(k, top),
+                onActive: (k: string) => {
+                  this.activeRun = k;
+                },
+                dictation: sp.part.key === this.dictationRun() ? this.dictation : '',
               })
                 .onAreaChange((_: Area, area: Area) => {
                   this.runTops.set(sp.part.key, Number(area.position.y ?? 0));
@@ -830,10 +949,14 @@ export struct DeskEditor {
       .height('100%')
       .align(Alignment.Top)
       .scrollBar(BarState.Auto)
+      // Words that scroll up under the bar blur and fade into the paper instead of being cut off.
+      .linearGradientBlur(24, topBlur(TOP_EDGE, this.pageHeight))
       .onAreaChange((_: Area, area: Area) => {
         this.viewport = Number(area.height);
+        this.pageHeight = this.viewport;
       })
 
+      TopFade(TOP_EDGE)
       this.Bar()
       if (this.originsOn || this.styleOn) {
         Column() {

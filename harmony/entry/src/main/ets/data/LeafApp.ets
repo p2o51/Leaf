@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { inputDevice } from '@kit.InputKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { Library } from './Library';
+import { LocalFolder } from './LocalFolder';
 import { SyncEngine } from './SyncEngine';
 
 /** AppStorage key: true while Leaf should use 电脑模式 (the 写作台), false for 平板模式. */
@@ -18,7 +19,10 @@ export class LeafApp {
 
   static open(context: common.Context): Promise<void> {
     if (LeafApp.opening === null) {
-      LeafApp.opening = LeafApp.lib.open(context);
+      // The essay folder starts once the library is open; it fetches unopened bodies through sync.
+      LeafApp.opening = LeafApp.lib.open(context).then(() => {
+        LocalFolder.shared.start(LeafApp.lib, LeafApp.lib.settings, (id: string) => LeafApp.sync.loadBody(id));
+      });
     }
     return LeafApp.opening;
   }

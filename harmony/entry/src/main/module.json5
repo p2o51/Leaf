@@ -24,6 +24,12 @@
           {
             "entities": ["entity.system.home"],
             "actions": ["action.system.home"]
+          },
+          // 用 Notion 登录: notion-oauth-relay sends the browser back to leaf://notion-oauth?code=…&state=….
+          {
+            "actions": ["ohos.want.action.viewData"],
+            "entities": ["entity.system.browsable"],
+            "uris": [{ "scheme": "leaf", "host": "notion-oauth" }]
           }
         ]
       }
@@ -34,7 +40,14 @@
         "reason": "$string:permission_internet",
         "usedScene": { "abilities": ["EntryAbility"], "when": "always" }
       },
-      { "name": "ohos.permission.GET_NETWORK_INFO" }
+      { "name": "ohos.permission.GET_NETWORK_INFO" },
+      {
+        "name": "ohos.permission.MICROPHONE",
+        "reason": "$string:permission_microphone",
+        "usedScene": { "abilities": ["EntryAbility"], "when": "inuse" }
+      },
+      // Keeps access to the folder the essays are saved in across launches.
+      { "name": "ohos.permission.FILE_ACCESS_PERSIST" }
     ]
   }
 }

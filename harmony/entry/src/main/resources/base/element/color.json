@@ -2,6 +2,7 @@
   "color": [
     { "name": "start_window_background", "value": "#FCFDF6" },
     { "name": "leaf_paper", "value": "#FCFDF6" },
+    { "name": "leaf_paper_clear", "value": "#00FCFDF6" },
     { "name": "leaf_side", "value": "#F3F7E7" },
     { "name": "leaf_card", "value": "#E2ECC9" },
     { "name": "leaf_raised", "value": "#FFFFFF" },

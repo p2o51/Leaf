@@ -86,6 +86,17 @@ export class Library {
     this.onQueued();
   }
 
+  /** Tags as a file in the essay folder lists them (Notion's 标签 are read from Notion, not written back). */
+  async setTags(id: string, tags: string[]): Promise<void> {
+    const e = this.essay(id);
+    if (e === undefined || e.tags.join('\u0000') === tags.join('\u0000')) {
+      return;
+    }
+    e.tags = tags.slice();
+    await this.db.upsertEssay(e);
+    this.notify();
+  }
+
   async deleteEssay(id: string): Promise<void> {
     const e = this.essay(id);
     if (e === undefined) {

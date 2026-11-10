@@ -13,15 +13,38 @@ export const PLEX_MONO: string = 'IBM Plex Mono';
 export const PLEX_SANS_SEMIBOLD: string = 'IBM Plex Sans SemiBold';
 export const PLEX_SERIF_SEMIBOLD: string = 'IBM Plex Serif SemiBold';
 
-/** Chinese falls back to the system's HarmonyOS Sans SC after the Plex face, as Android falls back to Noto CJK. */
+/**
+ * Chinese under the serif face is a serif too: the system's 方正书宋 (Simplified book Song), as the Mac
+ * falls back to Songti; the sans only where that file is missing. Sans and mono fall back to HarmonyOS Sans SC.
+ * ArkUI matches each name in a list exactly as written, so the lists have no space after their commas.
+ */
+const CJK_SERIF_FAMILY: string = 'Leaf CJK Serif';
+const CJK_SERIF_FILE: string = '/system/fonts/FZShuS-SC.ttf';
+const CJK_SERIF: string = `${CJK_SERIF_FAMILY},HarmonyOS Sans SC`;
+// 书宋 has one weight; headings take the system's 方正小标宋, the Song face Chinese titles are set in.
+const CJK_SERIF_BOLD_FAMILY: string = 'Leaf CJK Serif Bold';
+const CJK_SERIF_BOLD_FILE: string = '/system/fonts/FZXiaoBS-SC.ttf';
+
 export function familyOf(font: DeskFont): string {
   switch (font) {
     case DeskFont.Sans:
-      return `${PLEX_SANS}, HarmonyOS Sans SC`;
+      return `${PLEX_SANS},HarmonyOS Sans SC`;
     case DeskFont.Mono:
-      return `${PLEX_MONO}, HarmonyOS Sans SC`;
+      return `${PLEX_MONO},HarmonyOS Sans SC`;
     default:
-      return `${PLEX_SERIF}, HarmonyOS Sans SC`;
+      return `${PLEX_SERIF},${CJK_SERIF}`;
+  }
+}
+
+/** Headings and the title: the face's semibold, with a bold Song under the serif. */
+export function headingFamily(font: DeskFont): string {
+  switch (font) {
+    case DeskFont.Sans:
+      return `${PLEX_SANS_SEMIBOLD},HarmonyOS Sans SC`;
+    case DeskFont.Mono:
+      return familyOf(font);
+    default:
+      return `${PLEX_SERIF_SEMIBOLD},${CJK_SERIF_BOLD_FAMILY},HarmonyOS Sans SC`;
   }
 }
 
@@ -54,11 +77,15 @@ export function registerFonts(ui: UIContext): void {
   f.registerFont({ familyName: PLEX_MONO, familySrc: $rawfile('fonts/ibm_plex_mono_400.ttf') });
   f.registerFont({ familyName: PLEX_SANS_SEMIBOLD, familySrc: $rawfile('fonts/ibm_plex_sans_600.ttf') });
   f.registerFont({ familyName: PLEX_SERIF_SEMIBOLD, familySrc: $rawfile('fonts/ibm_plex_serif_600.ttf') });
+  // The system's own Song face, registered from its file: HarmonyOS does not hand its other system fonts
+  // to apps by family name. Where the file is missing the family stays empty and the sans takes over.
+  f.registerFont({ familyName: CJK_SERIF_FAMILY, familySrc: `file://${CJK_SERIF_FILE}` });
+  f.registerFont({ familyName: CJK_SERIF_BOLD_FAMILY, familySrc: `file://${CJK_SERIF_BOLD_FILE}` });
 }
 
-/** Reading type for card titles and previews, as Android sets them: serif, Chinese in the system face. */
+/** Reading type for titles and previews: the serif, Chinese in a serif too. */
 export function readingFamily(semibold: boolean): string {
-  return semibold ? `${PLEX_SERIF_SEMIBOLD}, HarmonyOS Sans SC` : familyOf(DeskFont.Serif);
+  return semibold ? `${PLEX_SERIF_SEMIBOLD},${CJK_SERIF}` : familyOf(DeskFont.Serif);
 }
 
 /** A card's date line, as on Android: 11月9日. */
@@ -142,6 +169,28 @@ export function IconButton(p: IconButtonParams) {
   .onClick(() => p.action())
 }
 
+/**
+ * The top edge of a scrolling column. What scrolls up under its bar is blurred more and more (see
+ * [topBlur]) and fades into the paper, rather than being cut off at the bar's edge.
+ */
+@Builder
+export function TopFade(height: number) {
+  Column()
+    .width('100%')
+    .height(height)
+    .linearGradient({
+      direction: GradientDirection.Bottom,
+      colors: [[$r('app.color.leaf_paper'), 0], [$r('app.color.leaf_paper'), 0.45], [$r('app.color.leaf_paper_clear'), 1]],
+    })
+    .hitTestBehavior(HitTestMode.None)
+}
+
+/** The blur under a [TopFade] of [edge] vp, for a scrolling view [viewport] vp tall: full at the top, none past it. */
+export function topBlur(edge: number, viewport: number): LinearGradientBlurOptions {
+  const end = viewport > edge ? edge / viewport : 1;
+  return { fractionStops: [[1, 0], [0, end], [0, 1]], direction: GradientDirection.Bottom };
+}
+
 /** How faded the words outside the focus are, as iA does it: still legible, clearly not now. */
 export const FADED_ALPHA: number = 0.28;
 
@@ -156,17 +205,20 @@ class Palette {
   readonly text: string;
   readonly quiet: string;
   readonly pasted: string;
+  readonly spoken: string;
 
-  constructor(text: string, quiet: string, pasted: string) {
+  constructor(text: string, quiet: string, pasted: string, spoken: string) {
     this.text = text;
     this.quiet = quiet;
     this.pasted = pasted;
+    this.spoken = spoken;
   }
 }
 
 // The system's font_primary and font_secondary, flattened onto the page so the faded alphas can apply.
-const LIGHT: Palette = new Palette('1A1A1A', '666666', '3A3FCB');
-const DARK: Palette = new Palette('E5E5E5', '999999', 'BEC2FF');
+// Pasted words take Leaf's indigo, dictated ones its green.
+const LIGHT: Palette = new Palette('1A1A1A', '666666', '3A3FCB', '2F6B00');
+const DARK: Palette = new Palette('E5E5E5', '999999', 'BEC2FF', 'A9D650');
 
 function withAlpha(rgb: string, alpha: number): string {
   const a = Math.round(Math.min(Math.max(alpha, 0), 1) * 255).toString(16).padStart(2, '0').toUpperCase();
@@ -180,6 +232,8 @@ export function inkColor(role: string, faded: boolean, dark: boolean): string {
   switch (role) {
     case 'pasted':
       return withAlpha(p.pasted, k);
+    case 'spoken':
+      return withAlpha(p.spoken, k);
     case 'mark':
       return withAlpha(p.quiet, 0.55 * k);
     case 'struck':

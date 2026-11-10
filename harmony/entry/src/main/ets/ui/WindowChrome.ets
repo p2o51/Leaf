@@ -42,11 +42,18 @@ export class WindowChrome {
     try {
       const win = stage.getMainWindowSync();
       WindowChrome.win = win;
-      win.setWindowLayoutFullScreen(true).catch((e: Error) => WindowChrome.log('layoutFullScreen', e));
       win.setWindowDecorVisible(false);
       win.setWindowDecorHeight(CAPTION_HEIGHT);
       WindowChrome.readButtons(win.getTitleButtonRect());
       win.on('windowTitleButtonRectChange', (r: window.TitleButtonRect) => WindowChrome.readButtons(r));
+      // The system's own maximize button makes the window immersive (status bar and dock hidden); a writing
+      // app keeps them, so a full-screen window is turned into a plain maximized one.
+      win.on('windowStatusChange', (status: window.WindowStatusType) => {
+        if (status === window.WindowStatusType.FULL_SCREEN) {
+          win.maximize(window.MaximizePresentation.EXIT_IMMERSIVE)
+            .catch((err: Error) => WindowChrome.log('maximize', err));
+        }
+      });
       AppStorage.setOrCreate<number>(CAPTION_TOP_KEY, CAPTION_HEIGHT);
     } catch (e) {
       WindowChrome.log('apply', e as Error);
@@ -72,7 +79,8 @@ export class WindowChrome {
       if (status === window.WindowStatusType.MAXIMIZE || status === window.WindowStatusType.FULL_SCREEN) {
         win.recover().catch((err: Error) => WindowChrome.log('recover', err));
       } else {
-        win.maximize().catch((err: Error) => WindowChrome.log('maximize', err));
+        // Not immersive: the status bar and the dock stay, as a maximized window keeps them on HarmonyOS PC.
+        win.maximize(window.MaximizePresentation.EXIT_IMMERSIVE).catch((err: Error) => WindowChrome.log('maximize', err));
       }
     } catch (e) {
       WindowChrome.log('toggleMaximize', e as Error);

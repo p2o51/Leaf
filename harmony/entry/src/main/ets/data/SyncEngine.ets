@@ -4,6 +4,7 @@ import { OutboxOp, PendingOp, SyncRules } from '../core/SyncRules';
 import { OutboxRow } from './LeafDb';
 import { Library, Listener, newId } from './Library';
 import { LeafNotion, NotionError, NotionFailure } from './NotionApi';
+import { NotionAuth, NotionOAuth } from './NotionOAuth';
 import { Connection, Vault } from './Settings';
 
 export enum SyncState {
@@ -11,7 +12,7 @@ export enum SyncState {
   Running = 'running',
   /** Will retry by itself (offline, rate limited). */
   Waiting = 'waiting',
-  /** Needs 51: the token stopped working or the database is no longer shared. */
+  /** Needs 51: the sign-in stopped working or the database is no longer shared. */
   NeedsAttention = 'needs_attention',
 }
 
@@ -28,6 +29,8 @@ const BACKGROUND_PULL_MS: number = 10 * 60 * 1000;
 export class SyncEngine {
   readonly notion: LeafNotion = new LeafNotion();
   private lib: Library;
+  /** Refreshes an expired OAuth token once, then retries; see NotionAuth. */
+  private auth: NotionAuth;
   private chain: Promise<void> = Promise.resolve();
   private pushTimer: number = -1;
   private pullTimer: number = -1;
@@ -37,6 +40,7 @@ export class SyncEngine {
 
   constructor(lib: Library) {
     this.lib = lib;
+    this.auth = new NotionAuth(() => lib.settings.connection() !== null);
     lib.onQueued = () => this.kick();
   }
 
@@ -96,15 +100,18 @@ export class SyncEngine {
       }
       const token = await Vault.token();
       if (token.length === 0) {
-        this.set(SyncState.NeedsAttention, '密钥不可用，重新连接 Notion');
+        this.set(SyncState.NeedsAttention, '登录信息不可用。请重新连接 Notion。');
         return;
       }
       this.set(SyncState.Running);
       try {
-        await this.push(token, c);
-        if (pull) {
-          await this.pull(token, c);
-        }
+        // An OAuth token that expired mid-run is refreshed once; the outbox keeps whatever had not gone out.
+        await this.auth.withToken<void>(token, async (current: string): Promise<void> => {
+          await this.push(current, c);
+          if (pull) {
+            await this.pull(current, c);
+          }
+        });
         this.set(SyncState.Idle);
       } catch (e) {
         this.fail(e as Error);
@@ -120,7 +127,7 @@ export class SyncEngine {
         this.set(SyncState.NeedsAttention, e.userMessage);
       }
     } else {
-      this.set(SyncState.Waiting, 'Notion 暂时连不上，稍后会自动重试');
+      this.set(SyncState.Waiting, '无法连接 Notion。稍后将自动重试。');
     }
   }
 
@@ -357,9 +364,10 @@ export class SyncEngine {
       if (!SyncRules.canRefresh(essayId, before, waiting)) {
         return;
       }
+      const pageId = e.pageId;
       let remote: RemoteBlock[] = [];
       try {
-        remote = await this.notion.essayBody(token, e.pageId);
+        remote = await this.auth.withToken<RemoteBlock[]>(token, (current: string) => this.notion.essayBody(current, pageId));
       } catch (err) {
         // Offline or refused: the open page keeps what it has and tries again on the next beat.
         return;
@@ -383,7 +391,7 @@ export class SyncEngine {
 
   // ---- connecting -----------------------------------------------------------------------------
 
-  /** Step 1: check the token and list the databases shared with it. */
+  /** Step 1: check the token (pasted, or from NotionOAuth.signIn) and list the databases shared with it. */
   async discover(token: string): Promise<DataSourceInfo[]> {
     const clean = token.trim();
     this.lastWorkspace = await this.notion.workspaceName(clean);
@@ -394,7 +402,7 @@ export class SyncEngine {
 
   /**
    * Step 2: add any missing fields, remember the 涂鸦墙 row so it never shows as an essay, save the
-   * connection and pull everything.
+   * connection and pull everything. A token from NotionOAuth.signIn is saved with its refresh token.
    */
   async connect(token: string, picked: DataSourceInfo): Promise<void> {
     const clean = token.trim();
@@ -416,13 +424,14 @@ export class SyncEngine {
     if (previous !== null && previous.dataSourceId !== source.id) {
       await this.lib.db.clearAll();
     }
-    await Vault.save(clean);
+    await Vault.save(NotionOAuth.credentialFor(clean));
+    NotionOAuth.forget();
     this.lib.settings.saveConnection(c);
     await this.lib.reload();
     await this.run(true);
   }
 
-  /** Forgets the token and every local copy; Notion keeps everything. */
+  /** Forgets the credential and every local copy; Notion keeps everything. */
   async disconnect(): Promise<void> {
     await Vault.clear();
     this.lib.settings.clearConnection();

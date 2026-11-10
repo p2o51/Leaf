@@ -9,7 +9,10 @@ product as the Android app: essays and tags on 51's Notion database, local first
   the ArkTS subset that is also TypeScript, with no @kit imports, so `tools/core-test` type-checks it,
   runs the shared acceptance cases on Node and runs the ArkTS linter, all without the HarmonyOS SDK.
 - `entry/src/main/ets/data/` — RDB library and outbox (LeafDb), Notion over Remote Communication Kit
-  (NotionApi), sync engine, token in the Asset Store, keyboard watch (电脑模式 / 平板模式).
+  (NotionApi), sync engine, Notion sign-in through notion-oauth-relay (NotionOAuth), the essay folder
+  (LocalFolder: one Markdown file per essay, front matter for Notion page / tags / colour / pin, kept in step
+  both ways; core/LocalFiles holds the rules), 语音输入 with ElevenLabs Scribe (Voice), keyboard watch
+  (电脑模式 / 平板模式). Notion is optional: without it essays live in the library and the folder.
 - `entry/src/main/ets/ui/`, `pages/` — home, the 写作台 (desk editor), the tablet block editor, settings.
   Home is laid out as Leaf for Mac: sidebar (search, 全部随笔, 颜色, 标签, sync line), essay list, and the
   写作台 beside it; narrower windows fold the sidebar into a drawer, then open an essay over the list. The
@@ -21,7 +24,7 @@ product as the Android app: essays and tags on 51's Notion database, local first
 Build, signing, install and the first-run checklist: [HANDOFF.md](HANDOFF.md).
 
 ```bash
-cd harmony/tools/core-test && npm ci && npm test   # 40 cases + ArkTS lint, no SDK needed
+cd harmony/tools/core-test && npm ci && npm test   # 73 cases + ArkTS lint, no SDK needed
 ```
 
 IBM Plex (OFL, `entry/src/main/resources/rawfile/fonts/IBM-Plex-OFL.txt`) is bundled for the 写作台; iA

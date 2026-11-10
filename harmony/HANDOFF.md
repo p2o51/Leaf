@@ -10,7 +10,7 @@
 - **电脑模式 = 写作台**（接了键盘；2in1 默认就是）：整篇 Markdown 一栏居中，照搬安卓 PR #15：专注（全文 / 句 / 段，其余淡到 0.28）、打字机、IBM Plex Serif/Sans/Mono、文风（中文填充词、程度副词、「的」过多、长句、半角标点，只标不改）、来源（粘贴的字换色，只存本机）。工具条打字时淡出，动鼠标回来，Esc 返回。⋯ 菜单里有文风规则开关和「用平板模式编辑这一篇」。
 - **平板模式**（没键盘）：按块编辑，长按块左侧把手拖动排序（Notion 没有移动，外发队列在新位置重写一块再删旧块），点把手改块类型 / 加一段 / 删除。右上「Markdown」切到写作台。
 - **本地优先**：打字只写本机库（RDB）；停笔 0.6 秒落库并排进外发队列，队列 1.5 秒后推；打开的那篇在停笔 5 秒后每 30 秒重拉一次，重拉时滤掉队列里还没发出的已删块；其余随笔 App 在前台时每 10 分钟后台拉一次。
-- **连接 Notion**：设置里贴内部集成密钥 → 选数据库 → 自动补「类型 / 卡片颜色 / 置顶」字段。密钥存 Asset Store（硬件加密，只本应用可读）。
+- **连接 Notion**：设置里「使用 Notion 登录」→ 浏览器里授权（经 notion-oauth-relay，回调 `leaf://notion-oauth`，和安卓同一个）→ 选数据库 → 自动补「类型 / 卡片颜色 / 置顶」字段。令牌存 Asset Store（硬件加密，只本应用可读），过期自动刷新。以前贴的内部集成密钥照样能用。
 
 **这一版没有**（之后再做）：涂鸦墙（只认出那一行、不当随笔显示）、照片和封面上传、用 Notion 登录（OAuth）、按住说、服务卡片、桌面多窗口。
 
@@ -19,7 +19,7 @@
 1. 华为开发者账号（免费，要实名）。
 2. Mac 上装 **DevEco Studio** 最新正式版（带 HarmonyOS SDK，API 20 以上：HDS 要 HarmonyOS 6.0），用账号登录一次，让它把 SDK 下全。
 3. MateBook：设置 › 关于本机 › 连点版本号开开发者模式，再在开发者选项里打开 USB 调试 / 无线调试。
-4. Notion：在 notion.so/profile/integrations 建一个内部集成（读取、更新、插入内容），把随笔数据库「连接」给它，密钥留着贴进 App。
+4. Notion：不用准备什么，App 里「使用 Notion 登录」，在授权页勾上随笔数据库。
 
 ## 3. 本地线程怎么做
 
@@ -80,7 +80,6 @@ hdc hilog | grep -i leaf              # 日志域 0x4C46，tag Leaf
 
 ## 6. 之后的事
 
-- 用 Notion 登录：notion-oauth-relay 要加鸿蒙的回调（可以用 App Linking 或自定义 scheme），App 端接 `want` 回调。
 - 涂鸦墙（只读 → 可写）、照片和封面上传（Notion File Upload，rcp 的 multipart）、按住说（ElevenLabs Scribe）。
 - 服务卡片、快捷输入；2in1 上的多窗口和菜单栏。
 - 和安卓共用的验收用例：`harmony/tools/core-test/test/DeskText.test.ts` 就是安卓 `DeskTextTest.kt` 一条对一条，两边改规则时一起改。

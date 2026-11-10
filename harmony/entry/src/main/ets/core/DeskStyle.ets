@@ -18,15 +18,15 @@ export const STYLE_RULES: StyleRule[] = [StyleRule.Filler, StyleRule.Degree, Sty
 export function styleRuleLabel(rule: StyleRule): string {
   switch (rule) {
     case StyleRule.Filler:
-      return '填充词：进行、其实、基本上…';
+      return '赘字：进行、其实、基本上…';
     case StyleRule.Degree:
       return '程度副词：非常、十分、极其…';
     case StyleRule.ManyDe:
-      return '一句里「的」超过 3 个';
+      return '“的”字过多：一句超过 3 个';
     case StyleRule.Long:
       return '长句：一句超过 60 字';
     default:
-      return '中文里夹了半角标点';
+      return '半角标点：中文里的 , ; : ? !';
   }
 }
 
@@ -152,6 +152,8 @@ class IndexedHit {
 export enum Origin {
   Typed = 'T',
   Pasted = 'P',
+  /** Dictated with 语音输入 (Scribe), to be read over: speech comes out wordier than writing. */
+  Spoken = 'S',
 }
 
 /** A run of non-typed words inside one block's text. */
@@ -287,7 +289,8 @@ export class DeskOrigins {
         if (Number.isNaN(a) || Number.isNaN(b)) {
           continue;
         }
-        spans.push(new OriginSpan(a, b, bits[2].charAt(0) === 'P' ? Origin.Pasted : Origin.Typed));
+        const kind = bits[2].charAt(0);
+        spans.push(new OriginSpan(a, b, kind === 'P' ? Origin.Pasted : (kind === 'S' ? Origin.Spoken : Origin.Typed)));
       }
       out.set(line.substring(0, tab), spans);
     }

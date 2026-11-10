@@ -16,7 +16,9 @@ import { SyncState } from '../data/SyncEngine';
 import { EssayPage } from '../ui/EssayPage';
 import { SettingsPage } from '../ui/SettingsPage';
 import { SideEntry, SideMenu } from '../ui/SideMenu';
-import { dayLabel, IconButtonParams, PLEX_SANS_SEMIBOLD, readingFamily, registerFonts, swatchColor } from '../ui/Look';
+import {
+  dayLabel, IconButtonParams, PLEX_SANS_SEMIBOLD, readingFamily, registerFonts, swatchColor, topBlur, TopFade,
+} from '../ui/Look';
 import { CAPTION_RIGHT_KEY, CAPTION_TOP_KEY, CaptionStrip, WINDOW_WIDTH_KEY, WindowChrome } from '../ui/WindowChrome';
 
 /** From this width (vp) the sidebar sits beside the list and the desk, as the Mac window's three columns. */
@@ -46,6 +48,7 @@ struct Index {
   /** The essay open in the desk beside the list; '' for none. */
   @State selected: string = '';
   @State hovered: string = '';
+  @State listHeight: number = 0;
   // Seeded with the window's opening width: starting from 0 would lay out the narrow form first and switch a
   // frame later.
   @State winWidth: number = AppStorage.get<number>(WINDOW_WIDTH_KEY) ?? 0;
@@ -69,7 +72,7 @@ struct Index {
       this.unsubscribe.push(LeafApp.lib.subscribe(() => this.refresh()));
       this.unsubscribe.push(LeafApp.sync.subscribe(() => {
         const s = LeafApp.sync;
-        this.status = s.state === SyncState.Running ? '同步中…' : s.message;
+        this.status = s.state === SyncState.Running ? '正在同步…' : s.message;
       }));
     });
   }
@@ -247,13 +250,13 @@ struct Index {
           .fontFamily(PLEX_SANS_SEMIBOLD)
           .fontColor($r('app.color.leaf_text'))
         this.DragSpace()
-        this.Tool({ icon: $r('sys.symbol.close_sidebar'), label: '收起侧栏', action: () => this.toggleSide() })
+        this.Tool({ icon: $r('sys.symbol.close_sidebar'), label: '隐藏侧栏', action: () => this.toggleSide() })
       }
       .width('100%')
       .height(HEADER)
       .padding({ left: 16, right: 8 })
 
-      Search({ value: this.search, placeholder: '搜索随笔' })
+      Search({ value: this.search, placeholder: '搜索' })
         .height(36)
         .margin({ left: 12, right: 12, bottom: 4 })
         .backgroundColor($r('app.color.leaf_chip'))
@@ -354,7 +357,7 @@ struct Index {
               .fontSize(12)
               .fontColor([this.isOpen(e.id) ? $r('app.color.leaf_on_lime') : $r('app.color.leaf_text_2')])
           }
-          Text(e.title.length > 0 ? e.title : '无题')
+          Text(e.title.length > 0 ? e.title : '无标题')
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.isOpen(e.id) ? $r('app.color.leaf_on_lime') : $r('app.color.leaf_text'))
@@ -398,15 +401,15 @@ struct Index {
   @Builder
   Empty() {
     Column({ space: 16 }) {
-      Text(this.search.trim().length > 0 ? '没有找到' : (this.connected ? '还没有随笔' : '写在这里，存进 Notion'))
+      Text(this.search.trim().length > 0 ? '无结果' : '无随笔')
         .fontSize(16)
         .fontFamily(readingFamily(false))
         .fontColor($r('app.color.leaf_text_2'))
-      if (!this.connected && this.search.trim().length === 0) {
-        Button('连接 Notion')
+      if (this.search.trim().length === 0) {
+        Button('新建随笔')
           .backgroundColor($r('app.color.leaf_green'))
           .fontColor($r('app.color.leaf_on_green'))
-          .onClick(() => this.openSettings())
+          .onClick(() => this.create())
       }
     }
     .width('100%')
@@ -416,10 +419,41 @@ struct Index {
 
   @Builder
   ListPane() {
-    Column() {
+    // The rows scroll up under the header and blur and fade into the paper there, rather than being cut off.
+    Stack({ alignContent: Alignment.Top }) {
+      if (!this.loading && this.visibleEssays().length === 0) {
+        Column() {
+          this.Empty()
+        }
+        .width('100%')
+        .height('100%')
+        .padding({ top: HEADER })
+      } else {
+        // A hairline between rows from the text's left edge, as the Mac list draws them; the 2vp gap keeps it
+        // off the open row's fill.
+        List({ space: 2 }) {
+          ForEach(this.visibleEssays(), (e: Essay) => {
+            ListItem() {
+              this.EssayRow(e)
+            }
+          }, (e: Essay) => `${e.id}:${e.editedAt}:${e.color.apiName}:${e.pinned}`)
+        }
+        .width('100%')
+        .height('100%')
+        .contentStartOffset(HEADER)
+        .contentEndOffset(16)
+        .padding({ left: 8, right: 8 })
+        .divider({ strokeWidth: 0.5, color: $r('app.color.leaf_chip'), startMargin: 22, endMargin: 12 })
+        .scrollBar(BarState.Auto)
+        .linearGradientBlur(24, topBlur(HEADER + 12, this.listHeight))
+        .onAreaChange((_: Area, area: Area) => {
+          this.listHeight = Number(area.height);
+        })
+      }
+      TopFade(HEADER + 12)
       Row({ space: 4 }) {
         if (!this.sideShown()) {
-          this.Tool({ icon: $r('sys.symbol.open_sidebar'), label: '打开侧栏', action: () => this.toggleSide() })
+          this.Tool({ icon: $r('sys.symbol.open_sidebar'), label: '显示侧栏', action: () => this.toggleSide() })
         }
         Column({ space: 1 }) {
           Text(this.title())
@@ -441,7 +475,7 @@ struct Index {
         .constraintSize({ maxWidth: '70%' })
         this.DragSpace()
         this.Tool({
-          icon: $r('sys.symbol.square_and_pencil'), label: '新随笔', action: () => {
+          icon: $r('sys.symbol.square_and_pencil'), label: '新建随笔', action: () => {
             this.create();
           }
         })
@@ -450,25 +484,6 @@ struct Index {
       .height(HEADER)
       // Alone in the window, the list's caption row also holds the window buttons at its right end.
       .padding({ left: this.sideShown() ? 16 : 8, right: this.split() ? 8 : Math.max(8, this.captionRight) })
-
-      if (!this.loading && this.visibleEssays().length === 0) {
-        this.Empty()
-      } else {
-        // A hairline between rows from the text's left edge, as the Mac list draws them; the 2vp gap keeps it
-        // off the open row's fill.
-        List({ space: 2 }) {
-          ForEach(this.visibleEssays(), (e: Essay) => {
-            ListItem() {
-              this.EssayRow(e)
-            }
-          }, (e: Essay) => `${e.id}:${e.editedAt}:${e.color.apiName}:${e.pinned}`)
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .padding({ left: 8, right: 8, bottom: 16 })
-        .divider({ strokeWidth: 0.5, color: $r('app.color.leaf_chip'), startMargin: 22, endMargin: 12 })
-        .scrollBar(BarState.Auto)
-      }
     }
     .width(this.split() ? LIST : '100%')
     .height('100%')
@@ -492,7 +507,7 @@ struct Index {
         }, (id: string) => id)
       } else {
         Column() {
-          Text(this.connected ? '选一篇随笔，或写一篇新的（Ctrl+N）' : '在设置里连接 Notion，或先写一篇（Ctrl+N）')
+          Text('选择随笔，或按 Ctrl+N 新建')
             .fontSize(15)
             .fontColor($r('app.color.leaf_text_2'))
             .opacity(0.7)

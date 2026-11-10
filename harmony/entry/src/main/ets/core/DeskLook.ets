@@ -7,6 +7,8 @@ export enum Ink {
   Text = 'text',
   /** Words that came in pasted (来源 on). */
   Pasted = 'pasted',
+  /** Words that came in by 语音输入 (来源 on). */
+  Spoken = 'spoken',
   /** Markdown marks (`## `, `- `, `> `): faint, so the words lead. */
   Mark = 'mark',
   /** Words 文风 asks to look at twice: struck through and faint. */
@@ -57,7 +59,8 @@ export class DeskLook {
     const bold: boolean[] = [];
     const shaded: boolean[] = [];
     for (let i = 0; i < n; i++) {
-      ink.push(origins !== null && i < origins.length && origins[i] === Origin.Pasted ? Ink.Pasted : Ink.Text);
+      const o = origins !== null && i < origins.length ? origins[i] : Origin.Typed;
+      ink.push(o === Origin.Pasted ? Ink.Pasted : (o === Origin.Spoken ? Ink.Spoken : Ink.Text));
       bold.push(false);
       shaded.push(false);
     }

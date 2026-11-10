@@ -11,17 +11,17 @@ const TYPES: string[] = ['paragraph', 'heading_1', 'heading_2', 'heading_3', 'qu
 function typeLabel(type: string): string {
   switch (type) {
     case 'heading_1':
-      return '大标题';
+      return '标题 1';
     case 'heading_2':
-      return '标题';
+      return '标题 2';
     case 'heading_3':
-      return '小标题';
+      return '标题 3';
     case 'quote':
       return '引用';
     case 'bulleted_list_item':
       return '列表';
     case 'numbered_list_item':
-      return '编号列表';
+      return '有序列表';
     default:
       return '正文';
   }
@@ -186,8 +186,8 @@ export struct TabletEditor {
           .selected(this.rows[index]?.block.type === t)
           .onClick(() => this.retype(index, t))
       }, (t: string) => t)
-      MenuItem({ content: '在下面加一段' }).onClick(() => this.addAfter(index))
-      MenuItem({ content: '删除此块' }).onClick(() => this.remove(index))
+      MenuItem({ content: '在下方添加段落' }).onClick(() => this.addAfter(index))
+      MenuItem({ content: '删除块' }).onClick(() => this.remove(index))
     }
   }
 
@@ -234,7 +234,7 @@ export struct TabletEditor {
       } else if (b.type === 'divider') {
         Divider().layoutWeight(1).margin({ top: 14 })
       } else {
-        Text(b.kind === BlockKind.Paragraph ? b.text : `Notion「${b.type}」块`)
+        Text(b.kind === BlockKind.Paragraph ? b.text : `Notion“${b.type}”块`)
           .fontSize(15)
           .fontColor(quietColor(this.dark, 0.85))
           .padding(12)
@@ -263,7 +263,7 @@ export struct TabletEditor {
         }
         Button('Markdown', { buttonStyle: ButtonStyleMode.NORMAL, controlSize: ControlSize.SMALL })
           .onClick(() => this.onDeskMode())
-        IconButton({ icon: $r('sys.symbol.plus'), label: '加一段', action: () => this.addAfter(this.rows.length - 1) })
+        IconButton({ icon: $r('sys.symbol.plus'), label: '添加段落', action: () => this.addAfter(this.rows.length - 1) })
       }
       .width('100%')
       .constraintSize({ minHeight: this.captionTop })

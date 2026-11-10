@@ -13,33 +13,40 @@ export enum NotionFailure {
   RateLimited = 'rate_limited',
   Unavailable = 'unavailable',
   InvalidResponse = 'invalid_response',
+  /** 用 Notion 登录 did not come back with a code (see NotionOAuth); the error carries what to say. */
+  SignIn = 'sign_in',
 }
 
 export class NotionError extends Error {
   readonly reason: NotionFailure;
   readonly status: number;
+  private readonly detail: string;
 
-  constructor(reason: NotionFailure, status: number = 0) {
+  constructor(reason: NotionFailure, status: number = 0, detail: string = '') {
     super(`Notion: ${reason}${status > 0 ? ` (${status})` : ''}`);
     this.reason = reason;
     this.status = status;
+    this.detail = detail;
   }
 
   /** What to tell 51. Never includes the token or a request body. */
   get userMessage(): string {
+    if (this.detail.length > 0) {
+      return this.detail;
+    }
     switch (this.reason) {
       case NotionFailure.Unauthorized:
-        return 'Notion 授权失效，重新连接';
+        return 'Notion 授权已失效。请重新连接。';
       case NotionFailure.Forbidden:
       case NotionFailure.NotFound:
-        return 'Leaf 看不到此页面：在 Notion 把数据库分享给集成';
+        return '无法访问此页面。请在 Notion 中将数据库分享给 Leaf。';
       case NotionFailure.InvalidInput:
-        return 'Notion 拒绝修改';
+        return 'Notion 拒绝了此修改。';
       case NotionFailure.RateLimited:
       case NotionFailure.Unavailable:
-        return '连不上 Notion，稍后自动重试';
+        return '无法连接 Notion。稍后将自动重试。';
       default:
-        return '无法解析 Notion 返回的内容';
+        return '无法处理 Notion 的响应。';
     }
   }
 
