@@ -17,7 +17,7 @@
 ## 2. 51 要准备的
 
 1. 华为开发者账号（免费，要实名）。
-2. Mac 上装 **DevEco Studio** 最新正式版（带 HarmonyOS SDK，API 12 以上），用账号登录一次，让它把 SDK 下全。
+2. Mac 上装 **DevEco Studio** 最新正式版（带 HarmonyOS SDK，API 20 以上：HDS 要 HarmonyOS 6.0），用账号登录一次，让它把 SDK 下全。
 3. MateBook：设置 › 关于本机 › 连点版本号开开发者模式，再在开发者选项里打开 USB 调试 / 无线调试。
 4. Notion：在 notion.so/profile/integrations 建一个内部集成（读取、更新、插入内容），把随笔数据库「连接」给它，密钥留着贴进 App。
 

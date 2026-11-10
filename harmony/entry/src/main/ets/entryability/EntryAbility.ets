@@ -2,6 +2,7 @@ import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { KeyboardWatch, LeafApp } from '../data/LeafApp';
+import { WindowChrome } from '../ui/WindowChrome';
 
 const DOMAIN: number = 0x4C46;
 
@@ -14,10 +15,13 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
     KeyboardWatch.start();
+    WindowChrome.measure(windowStage);
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
         hilog.error(DOMAIN, 'Leaf', 'loadContent failed: %{public}s', JSON.stringify(err));
+        return;
       }
+      WindowChrome.apply(windowStage);
     });
   }
 

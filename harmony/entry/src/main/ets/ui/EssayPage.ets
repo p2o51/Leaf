@@ -10,6 +10,8 @@ import { TabletEditor } from './TabletEditor';
 export struct EssayPage {
   essayId: string = '';
   onBack: () => void = () => {};
+  /** Beside the essay list (wide windows), so the editor shows no back button. */
+  embedded: boolean = false;
   @StorageProp(DESK_MODE_KEY) deskMode: boolean = false;
   /** null follows the keyboard; true / false is this visit's own choice. */
   @State override: boolean | null = null;
@@ -23,6 +25,7 @@ export struct EssayPage {
     if (this.desk()) {
       DeskEditor({
         essayId: this.essayId,
+        embedded: this.embedded,
         onBack: () => this.onBack(),
         onTabletMode: () => {
           this.override = false;
@@ -31,6 +34,7 @@ export struct EssayPage {
     } else {
       TabletEditor({
         essayId: this.essayId,
+        embedded: this.embedded,
         onBack: () => this.onBack(),
         onDeskMode: () => {
           this.override = true;

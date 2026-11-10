@@ -2,7 +2,8 @@ import { BlockKind, EssayBlock } from '../core/Models';
 import { DeskText } from '../core/DeskText';
 import { LeafApp } from '../data/LeafApp';
 import { newId } from '../data/Library';
-import { familyOf, DeskFont, quietColor, REFRESH_EVERY_MS, REFRESH_REST_MS, WRITE_AFTER_MS } from './Look';
+import { familyOf, DeskFont, IconButton, quietColor, REFRESH_EVERY_MS, REFRESH_REST_MS, WRITE_AFTER_MS } from './Look';
+import { CAPTION_RIGHT_KEY, CAPTION_TOP_KEY, WindowChrome } from './WindowChrome';
 
 /** The block types a touch user can turn a text block into, in the order the menu offers them. */
 const TYPES: string[] = ['paragraph', 'heading_1', 'heading_2', 'heading_3', 'quote', 'bulleted_list_item', 'numbered_list_item'];
@@ -60,11 +61,15 @@ class Row_ {
 export struct TabletEditor {
   essayId: string = '';
   onBack: () => void = () => {};
+  /** Shown beside the essay list rather than as its own page: no back button. */
+  embedded: boolean = false;
   onDeskMode: () => void = () => {};
   @StorageProp('leaf.dark') dark: boolean = false;
   @State rows: Row_[] = [];
   @State title: string = '';
   @State status: string = '';
+  @StorageProp(CAPTION_TOP_KEY) captionTop: number = 0;
+  @StorageProp(CAPTION_RIGHT_KEY) captionRight: number = 0;
   private writeTimer: number = -1;
   private titleTimer: number = -1;
   private refreshTimer: number = -1;
@@ -182,7 +187,7 @@ export struct TabletEditor {
           .onClick(() => this.retype(index, t))
       }, (t: string) => t)
       MenuItem({ content: '在下面加一段' }).onClick(() => this.addAfter(index))
-      MenuItem({ content: '删除这一块' }).onClick(() => this.remove(index))
+      MenuItem({ content: '删除此块' }).onClick(() => this.remove(index))
     }
   }
 
@@ -190,9 +195,9 @@ export struct TabletEditor {
   TextRow(index: number, b: EssayBlock) {
     Row({ space: 6 }) {
       // The handle: long-press it to drag (List's onMove), tap it for the block menu.
-      Text('⋮⋮')
-        .fontSize(14)
-        .fontColor(quietColor(this.dark, 0.5))
+      SymbolGlyph($r('sys.symbol.line_3_horizontal'))
+        .fontSize(16)
+        .fontColor([$r('sys.color.icon_tertiary')])
         .padding({ top: 10, left: 4, right: 4 })
         .bindMenu(this.BlockMenu(index))
       if (b.type === 'bulleted_list_item') {
@@ -208,7 +213,7 @@ export struct TabletEditor {
         .lineHeight(sizeFor(b.type) * 1.7)
         .backgroundColor(Color.Transparent)
         .padding({ left: b.type === 'quote' ? 12 : 0, top: 6, bottom: 6 })
-        .border(b.type === 'quote' ? { width: { left: 3 }, color: $r('app.color.primary') } : { width: 0 })
+        .border(b.type === 'quote' ? { width: { left: 3 }, color: $r('sys.color.font_tertiary') } : { width: 0 })
         .layoutWeight(1)
         .onChange((v: string) => this.edit(index, v))
     }
@@ -219,9 +224,9 @@ export struct TabletEditor {
   @Builder
   OtherRow(index: number, b: EssayBlock) {
     Row({ space: 6 }) {
-      Text('⋮⋮')
-        .fontSize(14)
-        .fontColor(quietColor(this.dark, 0.5))
+      SymbolGlyph($r('sys.symbol.line_3_horizontal'))
+        .fontSize(16)
+        .fontColor([$r('sys.color.icon_tertiary')])
         .padding({ top: 10, left: 4, right: 4 })
         .bindMenu(this.BlockMenu(index))
       if (b.kind === BlockKind.Photo) {
@@ -229,12 +234,12 @@ export struct TabletEditor {
       } else if (b.type === 'divider') {
         Divider().layoutWeight(1).margin({ top: 14 })
       } else {
-        Text(b.kind === BlockKind.Paragraph ? b.text : `Notion 里的「${b.type}」块`)
+        Text(b.kind === BlockKind.Paragraph ? b.text : `Notion「${b.type}」块`)
           .fontSize(15)
           .fontColor(quietColor(this.dark, 0.85))
           .padding(12)
           .borderRadius(14)
-          .backgroundColor($r('app.color.surface_container'))
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
           .layoutWeight(1)
       }
     }
@@ -245,24 +250,24 @@ export struct TabletEditor {
   build() {
     Column() {
       Row({ space: 8 }) {
-        Text('←').fontSize(20).padding(10).onClick(() => this.onBack())
-        Blank()
-        if (this.status.length > 0) {
-          Text(this.status).fontSize(13).fontColor($r('app.color.on_surface_variant')).maxLines(1)
+        if (!this.embedded) {
+          IconButton({ icon: $r('sys.symbol.arrow_left'), label: '返回', action: () => this.onBack() })
         }
-        Text('Markdown')
-          .fontSize(14)
-          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-          .borderRadius(999)
-          .backgroundColor($r('app.color.surface_container'))
+        // Stretched to the bar's own height: '100%' would take the page's and make the bar fill it.
+        Blank()
+          .alignSelf(ItemAlign.Stretch)
+          .onTouch((e: TouchEvent) => WindowChrome.drag(e))
+          .gesture(TapGesture({ count: 2 }).onAction(() => WindowChrome.toggleMaximize()))
+        if (this.status.length > 0) {
+          Text(this.status).fontSize(13).fontColor($r('sys.color.font_secondary')).maxLines(1)
+        }
+        Button('Markdown', { buttonStyle: ButtonStyleMode.NORMAL, controlSize: ControlSize.SMALL })
           .onClick(() => this.onDeskMode())
-        Text('＋')
-          .fontSize(20)
-          .padding(10)
-          .onClick(() => this.addAfter(this.rows.length - 1))
+        IconButton({ icon: $r('sys.symbol.plus'), label: '加一段', action: () => this.addAfter(this.rows.length - 1) })
       }
       .width('100%')
-      .padding({ left: 8, right: 8 })
+      .constraintSize({ minHeight: this.captionTop })
+      .padding({ left: 16, right: Math.max(16, this.captionRight) })
 
       List({ space: 4 }) {
         ListItem() {
@@ -301,6 +306,6 @@ export struct TabletEditor {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.surface'))
+    .backgroundColor($r('app.color.leaf_paper'))
   }
 }

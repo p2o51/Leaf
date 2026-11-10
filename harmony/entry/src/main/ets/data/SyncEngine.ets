@@ -96,7 +96,7 @@ export class SyncEngine {
       }
       const token = await Vault.token();
       if (token.length === 0) {
-        this.set(SyncState.NeedsAttention, '连接凭据不可用，请重新连接 Notion');
+        this.set(SyncState.NeedsAttention, '密钥不可用，重新连接 Notion');
         return;
       }
       this.set(SyncState.Running);

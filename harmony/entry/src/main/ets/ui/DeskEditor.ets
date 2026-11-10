@@ -8,6 +8,7 @@ import {
   DeskFont, familyOf, fontLabel, inkColor, lineHeightOf, PLEX_SANS, PLEX_SANS_SEMIBOLD, quietColor, REFRESH_EVERY_MS,
   REFRESH_REST_MS, sizeOf, WRITE_AFTER_MS,
 } from './Look';
+import { CAPTION_RIGHT_KEY, CAPTION_TOP_KEY, WindowChrome } from './WindowChrome';
 
 /** 专注: off, the sentence being written, or its paragraph; everything else fades. */
 export enum FocusMode {
@@ -248,7 +249,7 @@ struct DeskRun {
       })
       .enableDataDetector(false)
       .copyOptions(CopyOptions.LocalDevice)
-      .caretColor($r('app.color.primary'))
+      .caretColor($r('app.color.leaf_ink'))
       .backgroundColor(Color.Transparent)
       .padding(0)
       .width('100%')
@@ -274,21 +275,21 @@ struct ShownBlock {
         }
       } else if (this.block.kind === BlockKind.Attachment) {
         Row({ space: 10 }) {
-          Text('📎').fontSize(18)
+          SymbolGlyph($r('sys.symbol.paperclip')).fontSize(18).fontColor([$r('sys.color.icon_secondary')])
           Text(this.block.text.length > 0 ? this.block.text : this.block.type).fontSize(15).layoutWeight(1).maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .padding(14)
         .width('100%')
         .borderRadius(16)
-        .backgroundColor($r('app.color.surface_container'))
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
       } else if (this.block.type === 'divider') {
         Divider().color(quietColor(this.dark, 0.3)).margin({ top: 12, bottom: 12 })
       } else if (this.block.kind === BlockKind.Paragraph) {
         Text(this.block.text).fontSize(17).lineHeight(30).fontColor(quietColor(this.dark, 1))
         Text('带格式的段落，在平板模式或 Notion 里改').fontSize(12).fontColor(quietColor(this.dark, 0.7))
       } else {
-        Text(`Notion 里的「${this.block.type}」块，写作台先不改它`).fontSize(13).fontColor(quietColor(this.dark, 0.8))
+        Text(`Notion「${this.block.type}」块，在 Notion 里改`).fontSize(13).fontColor(quietColor(this.dark, 0.8))
       }
     }
     .alignItems(HorizontalAlign.Start)
@@ -296,6 +297,25 @@ struct ShownBlock {
     .margin({ top: 8, bottom: 8 })
   }
 }
+
+/** A toolbar chip. Passed to a @Builder as one object literal so it is passed by reference. */
+interface ChipParams {
+  label: string;
+  on: boolean;
+  action: () => void;
+}
+
+/** A toolbar switch drawn as an icon, as on the Mac's toolbar; [tip] shows on hover. */
+interface ToggleParams extends ChipParams {
+  symbol: Resource;
+  tip: string;
+}
+
+// What the bar's controls take (vp), left of the window buttons: everything; with the three switches folded
+// into 更多; and with the face folded in too. Measured on the MateBook with the widest face name (无衬线).
+const BAR_FULL: number = 400;
+const BAR_NO_SWITCHES: number = 280;
+const BACK_ROOM: number = 48;
 
 /** A run plus the generation it is shown under; a new generation rebuilds the run's editor. */
 class ShownPart {
@@ -327,6 +347,8 @@ export struct DeskEditor {
   essayId: string = '';
   onBack: () => void = () => {};
   onTabletMode: () => void = () => {};
+  /** Shown beside the essay list rather than as its own page: no back button. */
+  embedded: boolean = false;
   @StorageProp('leaf.dark') dark: boolean = false;
   @State shown: ShownPart[] = [];
   @State title: string = '';
@@ -337,8 +359,11 @@ export struct DeskEditor {
   @State originsOn: boolean = false;
   @State rulesKey: string = STYLE_RULES.join(',');
   @State barShown: boolean = true;
+  @State barWidth: number = 0;
   @State status: string = '';
   @State menuOpen: boolean = false;
+  @StorageProp(CAPTION_TOP_KEY) captionTop: number = 0;
+  @StorageProp(CAPTION_RIGHT_KEY) captionRight: number = 0;
   private scroller: Scroller = new Scroller();
   private body: EssayBlock[] = [];
   private runs: Map<string, EssayBlock[]> = new Map<string, EssayBlock[]>();
@@ -495,6 +520,35 @@ export struct DeskEditor {
     return value;
   }
 
+  private setTypewriter(on: boolean): void {
+    this.typewriter = this.toggle('desk.typewriter', on);
+  }
+
+  private setStyleOn(on: boolean): void {
+    this.styleOn = this.toggle('desk.style', on);
+  }
+
+  private setOriginsOn(on: boolean): void {
+    this.originsOn = this.toggle('desk.origins', on);
+  }
+
+  /** The bar's right padding: the window buttons' room (which keeps its own air), or a plain margin. */
+  private endInset(): number {
+    return Math.max(16, this.captionRight);
+  }
+
+  /**
+   * How much of the bar goes into 更多 when the desk is narrow (beside the list, the window buttons on its
+   * right), as the Mac folds its toolbar: 0 nothing, 1 the three switches, 2 the face as well.
+   */
+  private fold(): number {
+    if (this.barWidth <= 0) {
+      return 0;
+    }
+    const room = this.barWidth - 16 - this.endInset() - (this.embedded ? 0 : BACK_ROOM);
+    return room >= BAR_FULL ? 0 : (room >= BAR_NO_SWITCHES ? 1 : 2);
+  }
+
   private toggleRule(r: StyleRule): void {
     const on = new Set<string>(this.rulesKey.split(',').filter((x: string) => x.length > 0));
     if (on.has(r)) {
@@ -506,40 +560,108 @@ export struct DeskEditor {
     LeafApp.lib.settings.put('desk.rules', this.rulesKey);
   }
 
+  // One object-literal parameter, so ArkUI passes it by reference and the chip redraws when [on] changes;
+  // separate parameters are copied once and the chip would keep its first look.
+  //
+  // Chips are Buttons, not Texts with onClick: on a 2-in-1 the bar is the window's caption row, and there the
+  // system hands clicks only to buttons; anything else is taken as a press on the title bar.
+  //
+  // A segment is drawn as HarmonyOS's capsule SegmentButton is: a grey track, the chosen one a raised white pill.
   @Builder
-  Segment(label: string, on: boolean, action: () => void) {
-    Text(label)
-      .fontSize(14)
-      .fontFamily(PLEX_SANS)
-      .fontColor(on ? $r('app.color.on_surface') : $r('app.color.on_surface_variant'))
-      .padding({ left: 11, right: 11, top: 5, bottom: 5 })
-      .borderRadius(999)
-      .backgroundColor(on ? $r('app.color.surface') : Color.Transparent)
-      .onClick(action)
+  Segment(p: ChipParams) {
+    Button({ type: ButtonType.Capsule, stateEffect: true }) {
+      Text(p.label)
+        .fontSize(14)
+        .fontWeight(p.on ? FontWeight.Medium : FontWeight.Regular)
+        .fontColor(p.on ? $r('sys.color.font_primary') : $r('sys.color.font_secondary'))
+    }
+    .height(28)
+    .padding({ left: 12, right: 12 })
+    .backgroundColor(p.on ? $r('sys.color.comp_background_primary') : Color.Transparent)
+    .shadow(p.on ? ShadowStyle.OUTER_DEFAULT_XS : { radius: 0 })
+    .onClick(() => p.action())
   }
 
   @Builder
-  Toggle(label: string, on: boolean, action: () => void) {
-    Text(label)
-      .fontSize(14)
-      .fontColor(on ? $r('app.color.on_primary_container') : $r('app.color.on_surface_variant'))
-      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+  ToggleFill(p: ChipParams) {
+    Row()
+      .width('100%')
+      .height('100%')
       .borderRadius(999)
-      .backgroundColor(on ? $r('app.color.primary_container') : Color.Transparent)
-      .animation({ duration: 160 })
-      .onClick(action)
+      .backgroundColor($r('app.color.leaf_ink'))
+      .opacity(p.on ? 0.1 : 0)
+  }
+
+  // An icon, as on the Mac's toolbar; on: Leaf's indigo ink and a 10% fill (the caret's colour too).
+  @Builder
+  Toggle(p: ToggleParams) {
+    Button({ type: ButtonType.Circle, stateEffect: true }) {
+      SymbolGlyph(p.symbol)
+        .fontSize(18)
+        .fontColor([p.on ? $r('app.color.leaf_ink') : $r('sys.color.icon_primary')])
+    }
+    .width(32)
+    .height(32)
+    .backgroundColor(Color.Transparent)
+    // A background builder is sized by the button it sits under (a Stack sibling would take the bar's size).
+    .background(this.ToggleFill(p))
+    .accessibilityText(p.label)
+    .accessibilityChecked(p.on)
+    .bindTips(p.tip)
+    .onClick(() => p.action())
+  }
+
+  @Builder
+  FontMenu() {
+    Menu() {
+      ForEach(FONTS, (f: DeskFont) => {
+        MenuItem({ content: fontLabel(f) })
+          .selected(this.font === f)
+          .selectIcon(true)
+          .onClick(() => this.setFont(f))
+      }, (f: DeskFont) => f)
+    }
   }
 
   @Builder
   MoreMenu() {
     Menu() {
-      ForEach(STYLE_RULES, (r: StyleRule) => {
-        MenuItem({ content: styleRuleLabel(r) })
-          .selected(this.rulesKey.indexOf(r) >= 0)
-          .selectIcon(true)
-          .onChange(() => this.toggleRule(r))
-      }, (r: StyleRule) => r)
-      MenuItem({ content: '用平板模式编辑这一篇' })
+      // What the bar had no room for comes first.
+      if (this.fold() >= 1) {
+        MenuItemGroup() {
+          MenuItem({ content: '打字机' })
+            .selected(this.typewriter)
+            .selectIcon(true)
+            .onClick(() => this.setTypewriter(!this.typewriter))
+          MenuItem({ content: '文风' })
+            .selected(this.styleOn)
+            .selectIcon(true)
+            .onClick(() => this.setStyleOn(!this.styleOn))
+          MenuItem({ content: '来源' })
+            .selected(this.originsOn)
+            .selectIcon(true)
+            .onClick(() => this.setOriginsOn(!this.originsOn))
+        }
+      }
+      if (this.fold() >= 2) {
+        MenuItemGroup({ header: '字体' }) {
+          ForEach(FONTS, (f: DeskFont) => {
+            MenuItem({ content: fontLabel(f) })
+              .selected(this.font === f)
+              .selectIcon(true)
+              .onClick(() => this.setFont(f))
+          }, (f: DeskFont) => f)
+        }
+      }
+      MenuItemGroup({ header: '文风标出' }) {
+        ForEach(STYLE_RULES, (r: StyleRule) => {
+          MenuItem({ content: styleRuleLabel(r) })
+            .selected(this.rulesKey.indexOf(r) >= 0)
+            .selectIcon(true)
+            .onChange(() => this.toggleRule(r))
+        }, (r: StyleRule) => r)
+      }
+      MenuItem({ content: '切到平板模式' })
         .onClick(() => this.onTabletMode())
     }
   }
@@ -547,50 +669,89 @@ export struct DeskEditor {
   @Builder
   Bar() {
     Row({ space: 8 }) {
-      Text('←')
-        .fontSize(20)
-        .padding(8)
+      // Beside the list (the Mac layout) the desk has nowhere to go back to.
+      if (!this.embedded) {
+        Button({ type: ButtonType.Circle }) {
+          SymbolGlyph($r('sys.symbol.arrow_left')).fontSize(20).fontColor([$r('sys.color.icon_primary')])
+        }
+        .width(40)
+        .height(40)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .accessibilityText('返回')
         .onClick(() => this.onBack())
         .keyboardShortcut(FunctionKey.ESC, [])
+      }
       Row({ space: 2 }) {
         ForEach(FOCUS_MODES, (m: FocusMode) => {
-          this.Segment(focusLabel(m), this.focusMode === m, () => this.setFocus(m))
+          this.Segment({ label: focusLabel(m), on: this.focusMode === m, action: () => this.setFocus(m) })
         }, (m: FocusMode) => m)
       }
       .padding(3)
       .borderRadius(999)
-      .backgroundColor($r('app.color.surface_container'))
+      .backgroundColor($r('sys.color.comp_background_tertiary'))
 
-      this.Toggle('打字机', this.typewriter, () => {
-        this.typewriter = this.toggle('desk.typewriter', !this.typewriter);
-      })
-      Row({ space: 2 }) {
-        ForEach(FONTS, (f: DeskFont) => {
-          this.Segment(fontLabel(f), this.font === f, () => this.setFont(f))
-        }, (f: DeskFont) => f)
+      if (this.fold() === 0) {
+        this.Toggle({
+          label: '打字机', symbol: $r('sys.symbol.text_aligncenter'), tip: '打字机：正在写的一行停在中间',
+          on: this.typewriter, action: () => this.setTypewriter(!this.typewriter)
+        })
       }
-      .padding(3)
-      .borderRadius(999)
-      .backgroundColor($r('app.color.surface_container'))
-
-      this.Toggle('文风', this.styleOn, () => {
-        this.styleOn = this.toggle('desk.style', !this.styleOn);
-      })
-      this.Toggle('来源', this.originsOn, () => {
-        this.originsOn = this.toggle('desk.origins', !this.originsOn);
-      })
+      // One pop-up for the face, as the Mac toolbar has it: the face's name and a chevron.
+      if (this.fold() < 2) {
+        Button({ type: ButtonType.Capsule, stateEffect: true }) {
+          Row({ space: 4 }) {
+            Text(fontLabel(this.font)).fontSize(14).fontColor($r('sys.color.font_primary'))
+            SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(12).fontColor([$r('sys.color.icon_secondary')])
+          }
+        }
+        .height(32)
+        .padding({ left: 12, right: 10 })
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .accessibilityText(`字体：${fontLabel(this.font)}`)
+        .bindMenu(this.FontMenu())
+      }
+      if (this.fold() === 0) {
+        this.Toggle({
+          label: '文风', symbol: $r('sys.symbol.doc_text_badge_checkmark'), tip: '文风：标出值得再看一眼的词，只标不改',
+          on: this.styleOn, action: () => this.setStyleOn(!this.styleOn)
+        })
+        this.Toggle({
+          label: '来源', symbol: $r('sys.symbol.text_clipboard'), tip: '来源：粘贴进来的字换个颜色',
+          on: this.originsOn, action: () => this.setOriginsOn(!this.originsOn)
+        })
+      }
+      // Stretched to the bar's own height: '100%' would take the page's and make the bar fill it.
       Blank()
+        .alignSelf(ItemAlign.Stretch)
+        .onTouch((e: TouchEvent) => WindowChrome.drag(e))
+        .gesture(TapGesture({ count: 2 }).onAction(() => WindowChrome.toggleMaximize()))
       if (this.status.length > 0) {
-        Text(this.status).fontSize(13).fontColor($r('app.color.on_surface_variant')).maxLines(1)
+        Text(this.status)
+          .fontSize(13)
+          .fontColor($r('sys.color.font_secondary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .flexShrink(1)
       }
-      Text('⋯')
-        .fontSize(20)
-        .padding(8)
-        .bindMenu(this.MoreMenu())
+      Button({ type: ButtonType.Circle }) {
+        SymbolGlyph($r('sys.symbol.dot_grid_2x2')).fontSize(20).fontColor([$r('sys.color.icon_primary')])
+      }
+      .width(40)
+      .height(40)
+      .backgroundColor($r('sys.color.comp_background_tertiary'))
+      .accessibilityText('更多')
+      .bindTips('更多')
+      // Opens leftwards, so it stays inside the window rather than hanging past its right edge.
+      .bindMenu(this.MoreMenu(), { placement: Placement.BottomRight })
     }
     .width('100%')
-    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
-    .backgroundColor($r('app.color.surface'))
+    .onAreaChange((_: Area, area: Area) => {
+      this.barWidth = Number(area.width);
+    })
+    // On a 2-in-1 the bar is the window's caption row: the window buttons sit at its right end.
+    .constraintSize({ minHeight: this.captionTop })
+    .padding({ left: 16, right: this.endInset(), top: 8, bottom: 8 })
+    .backgroundColor($r('app.color.leaf_paper'))
     .opacity(this.barShown ? 1 : 0)
   }
 
@@ -598,16 +759,16 @@ export struct DeskEditor {
   Legend() {
     Row({ space: 14 }) {
       if (this.originsOn) {
-        Text('● 手打').fontSize(12).fontColor($r('app.color.on_surface'))
+        Text('● 手打').fontSize(12).fontColor($r('sys.color.font_primary'))
         Text('● 粘贴').fontSize(12).fontColor($r('app.color.pasted'))
       }
       if (this.styleOn) {
-        Text('划掉的词：再看一眼，不会替你改').fontSize(12).fontColor($r('app.color.on_surface_variant'))
+        Text('划掉的词：仅作提醒，不自动改').fontSize(12).fontColor($r('sys.color.font_secondary'))
       }
     }
     .padding({ left: 14, right: 14, top: 6, bottom: 6 })
     .borderRadius(999)
-    .backgroundColor($r('app.color.surface_container'))
+    .backgroundColor($r('app.color.leaf_side'))
   }
 
   build() {
@@ -622,6 +783,10 @@ export struct DeskEditor {
             .padding(0)
             .margin({ bottom: 24 })
             .onChange((v: string) => {
+              // The field also reports the title the page itself put in (on opening); that is not typing.
+              if (v === this.title) {
+                return;
+              }
               this.title = v;
               this.typing();
               if (this.titleTimer >= 0) {
@@ -683,7 +848,7 @@ export struct DeskEditor {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.surface'))
+    .backgroundColor($r('app.color.leaf_paper'))
     // Any pointer movement brings the bar back; typing fades it.
     .onHover(() => this.showBar())
     .onMouse(() => this.showBar())

@@ -29,17 +29,17 @@ export class NotionError extends Error {
   get userMessage(): string {
     switch (this.reason) {
       case NotionFailure.Unauthorized:
-        return 'Notion 不再认这个连接，请重新连接';
+        return 'Notion 授权失效，重新连接';
       case NotionFailure.Forbidden:
       case NotionFailure.NotFound:
-        return 'Leaf 看不到这个页面：在 Notion 里把数据库分享给你的集成';
+        return 'Leaf 看不到此页面：在 Notion 把数据库分享给集成';
       case NotionFailure.InvalidInput:
-        return 'Notion 拒绝了这次修改';
+        return 'Notion 拒绝修改';
       case NotionFailure.RateLimited:
       case NotionFailure.Unavailable:
-        return 'Notion 暂时连不上，稍后会自动重试';
+        return '连不上 Notion，稍后自动重试';
       default:
-        return 'Notion 返回了看不懂的内容';
+        return '无法解析 Notion 返回的内容';
     }
   }
 

@@ -11,6 +11,12 @@ product as the Android app: essays and tags on 51's Notion database, local first
 - `entry/src/main/ets/data/` — RDB library and outbox (LeafDb), Notion over Remote Communication Kit
   (NotionApi), sync engine, token in the Asset Store, keyboard watch (电脑模式 / 平板模式).
 - `entry/src/main/ets/ui/`, `pages/` — home, the 写作台 (desk editor), the tablet block editor, settings.
+  Home is laid out as Leaf for Mac: sidebar (search, 全部随笔, 颜色, 标签, sync line), essay list, and the
+  写作台 beside it; narrower windows fold the sidebar into a drawer, then open an essay over the list. The
+  frame is HarmonyOS's own: HDS (UI Design Kit) side bar and navigation, `sys.symbol` icons, and on a 2-in-1
+  the window's title bar merged into each column's top row (`ui/WindowChrome.ets`). What stays Leaf's: the
+  写作台's type (IBM Plex), the lime / paper / indigo palette and the Notion colours. HDS needs HarmonyOS 6.0
+  (API 20), so that is the minimum.
 
 Build, signing, install and the first-run checklist: [HANDOFF.md](HANDOFF.md).
 
