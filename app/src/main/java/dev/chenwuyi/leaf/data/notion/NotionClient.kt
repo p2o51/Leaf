@@ -37,8 +37,10 @@ class NotionException(val reason: NotionFailure, val status: Int? = null) : IOEx
 }
 
 /**
- * Thin HTTP layer for the Notion API. One instance serializes every call and keeps them about 350 ms
- * apart (Notion allows about three a second), and retries 429 / 5xx with Retry-After or backoff.
+ * Thin HTTP layer for the Notion API. One instance starts calls at least about 350 ms apart (Notion
+ * allows about three a second) and retries 429 / 5xx with Retry-After or backoff. Only the start is
+ * spaced, not the whole round trip: on a slow network a call can take a second, and holding the slot
+ * for all of it cut a first pull to one call a second.
  */
 class NotionClient(
     client: OkHttpClient = OkHttpClient(),
@@ -70,43 +72,47 @@ class NotionClient(
 
     private fun JSONObject.toJsonBody() = toString().toRequestBody("application/json; charset=utf-8".toMediaType())
 
-    private suspend fun call(token: String, method: String, path: String, body: RequestBody?, query: Map<String, String?> = emptyMap()): JSONObject =
-        mutex.withLock {
-            if (token.isBlank() || token.any { it == '\n' || it == '\r' }) throw NotionException(NotionFailure.Unauthorized)
-            val url = baseUrl.newBuilder().addEncodedPathSegments(path).apply {
-                query.forEach { (k, v) -> if (v != null) addQueryParameter(k, v) }
-            }.build()
-            val request = Request.Builder().url(url)
-                .header("Authorization", "Bearer ${token.trim()}")
-                .header("Notion-Version", API_VERSION)
-                .header("Accept", "application/json")
-                .method(method, body ?: if (method == "PATCH" || method == "POST") ByteArray(0).toRequestBody() else null)
-                .build()
-            for (attempt in 0..MAX_RETRIES) {
-                val wait = requestIntervalMillis - (System.nanoTime() / 1_000_000 - lastRequestAt)
-                if (wait > 0) pause(wait)
-                lastRequestAt = System.nanoTime() / 1_000_000
-                val response = try {
-                    http.newCall(request).await()
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: IOException) {
-                    if (attempt == MAX_RETRIES) throw NotionException(NotionFailure.Unavailable)
-                    pause(backoff(attempt))
-                    continue
-                }
-                var retryIn: Long? = null
-                response.use {
-                    val json = try { JSONObject(it.body.string()) } catch (_: JSONException) { null }
-                    if (it.isSuccessful) return@withLock json ?: throw NotionException(NotionFailure.InvalidResponse, it.code)
-                    val retryable = it.code in setOf(429, 500, 502, 503, 504, 529)
-                    if (!retryable || attempt == MAX_RETRIES) throw NotionException(failureFor(it.code), it.code)
-                    retryIn = it.header("Retry-After")?.toLongOrNull()?.takeIf { s -> s in 0..600 }?.let { s -> s * 1_000 } ?: backoff(attempt)
-                }
-                retryIn?.let { pause(it) }
+    /** Waits until this caller may start its request; callers start in order, [requestIntervalMillis] apart. */
+    private suspend fun awaitSlot() = mutex.withLock {
+        val wait = requestIntervalMillis - (System.nanoTime() / 1_000_000 - lastRequestAt)
+        if (wait > 0) pause(wait)
+        lastRequestAt = System.nanoTime() / 1_000_000
+    }
+
+    private suspend fun call(token: String, method: String, path: String, body: RequestBody?, query: Map<String, String?> = emptyMap()): JSONObject {
+        if (token.isBlank() || token.any { it == '\n' || it == '\r' }) throw NotionException(NotionFailure.Unauthorized)
+        val url = baseUrl.newBuilder().addEncodedPathSegments(path).apply {
+            query.forEach { (k, v) -> if (v != null) addQueryParameter(k, v) }
+        }.build()
+        val request = Request.Builder().url(url)
+            .header("Authorization", "Bearer ${token.trim()}")
+            .header("Notion-Version", API_VERSION)
+            .header("Accept", "application/json")
+            .method(method, body ?: if (method == "PATCH" || method == "POST") ByteArray(0).toRequestBody() else null)
+            .build()
+        for (attempt in 0..MAX_RETRIES) {
+            awaitSlot()
+            val response = try {
+                http.newCall(request).await()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: IOException) {
+                if (attempt == MAX_RETRIES) throw NotionException(NotionFailure.Unavailable)
+                pause(backoff(attempt))
+                continue
             }
-            throw NotionException(NotionFailure.Unavailable)
+            var retryIn: Long? = null
+            response.use {
+                val json = try { JSONObject(it.body.string()) } catch (_: JSONException) { null }
+                if (it.isSuccessful) return json ?: throw NotionException(NotionFailure.InvalidResponse, it.code)
+                val retryable = it.code in setOf(429, 500, 502, 503, 504, 529)
+                if (!retryable || attempt == MAX_RETRIES) throw NotionException(failureFor(it.code), it.code)
+                retryIn = it.header("Retry-After")?.toLongOrNull()?.takeIf { s -> s in 0..600 }?.let { s -> s * 1_000 } ?: backoff(attempt)
+            }
+            retryIn?.let { pause(it) }
         }
+        throw NotionException(NotionFailure.Unavailable)
+    }
 
     private fun backoff(attempt: Int) = minOf(1_000L shl attempt, 30_000L) + Random.nextLong(0, 251)
 

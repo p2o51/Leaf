@@ -10,6 +10,15 @@ import dev.chenwuyi.leaf.data.notion.NotionFailure
 import dev.chenwuyi.leaf.data.notion.NotionOAuthRelay
 import dev.chenwuyi.leaf.data.settings.Connection
 import dev.chenwuyi.leaf.data.settings.ConnectionStore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+/**
+ * Where a connect is. While it is [Preparing], the sample data is still in Room but must not be shown;
+ * while [Pulling], home fills in from Notion as rows arrive.
+ */
+enum class ConnectPhase { Idle, Preparing, Pulling }
 
 /** Connecting and disconnecting a Notion database (plan: 首次启动选一个数据库，缺什么字段就补什么). */
 class NotionSetup(
@@ -19,6 +28,9 @@ class NotionSetup(
     private val engine: SyncEngine,
     private val oauth: NotionOAuthRelay? = null,
 ) {
+    private val phaseState = MutableStateFlow(ConnectPhase.Idle)
+    val phase: StateFlow<ConnectPhase> = phaseState.asStateFlow()
+
     /** 用 Notion 登录 is offered only when there is a relay to exchange the code. */
     val signInAvailable: Boolean get() = oauth != null
 
@@ -41,14 +53,20 @@ class NotionSetup(
      * the sample data and pull everything.
      */
     suspend fun connect(credential: NotionCredential, workspace: String, picked: DataSourceInfo) {
-        val clean = credential.accessToken.trim()
-        val source = notion.ensureSchema(clean, notion.dataSource(clean, picked.id))
-        val titleProperty = source.titleProperty ?: throw NotionException(NotionFailure.InvalidResponse)
-        val wall = notion.rows(clean, source).filter { it.isWall }.minByOrNull { it.editedAt }?.pageId
-            ?: notion.createPage(clean, source, LeafSchema.WallTitle, LeafSchema.TypeWall)
-        dao.clearAll()
-        store.save(Connection(workspace, source.id, source.name, titleProperty, wall), credential)
-        engine.run()
+        phaseState.value = ConnectPhase.Preparing
+        try {
+            val clean = credential.accessToken.trim()
+            val source = notion.ensureSchema(clean, notion.dataSource(clean, picked.id))
+            val titleProperty = source.titleProperty ?: throw NotionException(NotionFailure.InvalidResponse)
+            val wall = notion.rows(clean, source).filter { it.isWall }.minByOrNull { it.editedAt }?.pageId
+                ?: notion.createPage(clean, source, LeafSchema.WallTitle, LeafSchema.TypeWall)
+            dao.clearAll()
+            store.save(Connection(workspace, source.id, source.name, titleProperty, wall), credential)
+            phaseState.value = ConnectPhase.Pulling
+            engine.run()
+        } finally {
+            phaseState.value = ConnectPhase.Idle
+        }
     }
 
     /** Forgets the credential and every local copy; Notion keeps everything. */

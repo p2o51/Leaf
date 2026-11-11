@@ -14,6 +14,7 @@ import dev.chenwuyi.leaf.data.settings.ElevenLabsKey
 import dev.chenwuyi.leaf.data.settings.MemoryAppearanceStore
 import dev.chenwuyi.leaf.data.settings.MemorySpeechKeyStore
 import dev.chenwuyi.leaf.data.settings.SpeechKeyStore
+import dev.chenwuyi.leaf.data.sync.ConnectPhase
 import dev.chenwuyi.leaf.data.sync.NotionSetup
 import dev.chenwuyi.leaf.data.sync.SyncStatus
 import java.io.IOException
@@ -43,6 +44,9 @@ class SettingsViewModel(
 ) : ViewModel() {
     private val stepState = MutableStateFlow<ConnectStep>(ConnectStep.Token())
     val step: StateFlow<ConnectStep> = stepState.asStateFlow()
+
+    /** A connect under way; home shows its loading page instead of the samples while it runs. */
+    val connectPhase: StateFlow<ConnectPhase> = setup.phase
 
     /** Step 1 leads with 用 Notion 登录; the integration token stays as the fallback. */
     val signInAvailable: Boolean get() = setup.signInAvailable
@@ -75,6 +79,7 @@ class SettingsViewModel(
                     } catch (_: IOException) {
                         ConnectStep.Token(error = "连不上 Notion，检查一下网络")
                     }
+                    pickTheOnlyOne()
                 }
             }
         }
@@ -128,7 +133,14 @@ class SettingsViewModel(
             } catch (_: IOException) {
                 ConnectStep.Token(error = "连不上 Notion，检查一下网络")
             }
+            pickTheOnlyOne()
         }
+    }
+
+    /** One database shared with Leaf leaves nothing to pick: signing in goes straight on to loading it. */
+    private fun pickTheOnlyOne() {
+        val pick = stepState.value as? ConnectStep.Pick ?: return
+        pick.sources.singleOrNull()?.let(::connect)
     }
 
     fun connect(source: DataSourceInfo) {
