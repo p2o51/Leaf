@@ -57,9 +57,6 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
     val tags: StateFlow<List<String>> = combine(scribbles, essays, TagRules::all).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val colorsInUse: StateFlow<List<NotionColor>> = combine(scribbles, essays, TagRules::colorsInUse).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    private val queryState = MutableStateFlow("")
-    val query: StateFlow<String> = queryState.asStateFlow()
-
     private val openEssayState = MutableStateFlow<String?>(null)
     val openEssayId: StateFlow<String?> = openEssayState.asStateFlow()
 
@@ -78,8 +75,6 @@ class LeafViewModel(private val repository: LeafRepository, seed: suspend () -> 
             }
         }
     }
-
-    fun setQuery(q: String) = queryState.update { q }
 
     fun setFilter(filter: HomeFilter) = filterState.update { filter }
 
