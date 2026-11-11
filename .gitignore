@@ -10,3 +10,8 @@
 *.jks
 *.keystore
 .env*
+
+# SwiftPM build output (apple/)
+.build/
+.swiftpm/
+apple/Leaf/build/
