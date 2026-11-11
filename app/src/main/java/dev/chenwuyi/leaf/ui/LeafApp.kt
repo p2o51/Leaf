@@ -63,6 +63,8 @@ import dev.chenwuyi.leaf.ui.capture.VoiceSession
 import dev.chenwuyi.leaf.ui.capture.canRecord
 import dev.chenwuyi.leaf.data.voice.VoiceRecognizers
 import dev.chenwuyi.leaf.ui.component.BackPreview
+import dev.chenwuyi.leaf.ui.component.DesktopCommand
+import dev.chenwuyi.leaf.ui.component.DesktopCommands
 import dev.chenwuyi.leaf.ui.component.LocalSharedTransitionScope
 import dev.chenwuyi.leaf.ui.component.PagePredictiveBack
 import dev.chenwuyi.leaf.ui.component.backPose
@@ -88,7 +90,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
+fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel, desktop: DesktopCommands? = null) {
     val allScribbles by vm.scribbles.collectAsStateWithLifecycle()
     val allEssays by vm.essays.collectAsStateWithLifecycle()
     val openId by vm.openEssayId.collectAsStateWithLifecycle()
@@ -146,6 +148,18 @@ fun LeafApp(vm: LeafViewModel, settings: SettingsViewModel) {
             AddKind.Voice -> capture = Capture.Voice
             AddKind.Text -> capture = Capture.Text()
             AddKind.Essay -> vm.newEssay()
+        }
+    }
+
+    // Keyboard shortcuts from the activity (Googlebook, a tablet keyboard). Esc is not here; it is back.
+    LaunchedEffect(desktop) {
+        desktop?.commands?.collect { command ->
+            when (command) {
+                DesktopCommand.NewEssay -> vm.newEssay()
+                DesktopCommand.NewScribble -> if (capture == null) capture = Capture.Text()
+                DesktopCommand.Settings -> settingsOpen = true
+                DesktopCommand.CloseEssay -> vm.closeEssay()
+            }
         }
     }
 

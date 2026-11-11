@@ -3,6 +3,7 @@ package dev.chenwuyi.leaf.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import dev.chenwuyi.leaf.ui.component.onSecondaryClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +35,7 @@ fun EssayCard(essay: Essay, active: Boolean, tall: Boolean, onClick: () -> Unit,
     val tones = LocalNotionTones.current
     val fill = if (essay.color == NotionColor.Default) MaterialTheme.colorScheme.surfaceContainerHigh else tones.fill(essay.color)
     val shape = if (active) RoundedCornerShape(28.dp, 28.dp, 28.dp, 10.dp) else RoundedCornerShape(28.dp)
-    Column(modifier.fillMaxWidth().clip(shape).background(fill).combinedClickable(onLongClickLabel = if (onLongClick != null) "管理" else null, onLongClick = onLongClick, onClick = onClick)) {
+    Column(modifier.fillMaxWidth().clip(shape).background(fill).onSecondaryClick(onLongClick).combinedClickable(onLongClickLabel = if (onLongClick != null) "管理" else null, onLongClick = onLongClick, onClick = onClick)) {
         essay.cover?.let { cover ->
             Box(Modifier.fillMaxWidth().height(if (tall) 220.dp else 140.dp)) {
                 dev.chenwuyi.leaf.ui.component.PictureView(cover, Modifier.fillMaxWidth().height(if (tall) 220.dp else 140.dp))
